@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 from numba import jit, prange
+from tqdm import trange
 import h5py
 from fuzzysearch import find_near_matches
 from fuzzywuzzy import fuzz
@@ -104,7 +105,7 @@ class PCR(object):
 
         if self.memsave:
             os.makedirs(self.tempdir, exist_ok = True)
-            bench_df.to_hdf(path_or_buf=os.path.join(self.tempdir,"PCRBenchmark.h5"),
+            bench_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
                             key = "bench",
                             mode = "w",
                             format = "table",
@@ -115,7 +116,7 @@ class PCR(object):
             Fs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "F"),:].values
             Rs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "R"),:].values
             df_dict = dict((key,[]) for key in col_list)
-            for row in range(self.sequences.shape[0]): #prange
+            for row in trange(self.sequences.shape[0]): #prange
                 for f in Fs:
                     for r in Rs:
                         header = self.sequences[row,0]
@@ -129,10 +130,6 @@ class PCR(object):
                         if type(f_res) == type(tuple()):
                             start = f_res[0]
                             f_match = f_ver
-
-                        # elif f_res == None:
-                        #     start = None
-                        #     f_none = True
 
                         elif f_res == None:
                             start = None
@@ -166,7 +163,7 @@ class PCR(object):
                                                     F_match = f_match,
                                                     R_primer = r_ver,
                                                     R_match = r_match)
-                        print(PPC)
+
                         df_dict["F Primer Name"].append(f_name)
                         df_dict["F Primer Version"].append(f_ver)
                         df_dict["R Primer Name"].append(r_name)
@@ -179,7 +176,7 @@ class PCR(object):
                         df_dict["PPC"].append(PPC)
 
             group_df = pd.DataFrame(df_dict, columns = col_list)
-            group_df.to_csv("{}.csv".format(group), index = False)
+            # group_df.to_csv("{}.csv".format(group), index = False)
             
 
             v_stats = dict((key,[]) for key in summary_col_list)
@@ -194,13 +191,13 @@ class PCR(object):
                     v_stats["Mean PPC"].append(mean_ppc)
                     v_stats["Sequences matched(%)"].append((seqs_matched / n_seqs)*100)
             group_stats = pd.DataFrame(v_stats, columns = summary_col_list)
-            group_stats.to_csv("{}_stats.csv".format(group), index = False)
+            # group_stats.to_csv("{}_stats.csv".format(group), index = False)
             summary = summary.append(group_stats)
 
 
 
             if self.memsave:
-                group_df.to_hdf(path_or_buf=os.path.join(self.tempdir,"PCRBenchmark.h5"),
+                group_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
                                 key = group,
                                 mode = "a",
                                 format = "table",
