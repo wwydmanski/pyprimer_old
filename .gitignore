@@ -1,2 +1,4 @@
 unit_test.py
 pyprimer.egg-info/*
+__pycache__/*
+utils/__pycache__/*

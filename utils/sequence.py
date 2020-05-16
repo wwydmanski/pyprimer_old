@@ -544,9 +544,9 @@ class PCRPrimer(object):
 
                     for version_ in versions:
                         # print(version_)
-                        seriesdict["Origin"].append(origin_)
+                        seriesdict["Origin"].append(origin_[1:])
                         seriesdict["Target"].append(target_)
-                        seriesdict["ID"].append("{}_{}".format(origin_,target_))
+                        seriesdict["ID"].append("{}_{}".format(origin_[1:],target_))
                         seriesdict["Name"].append(name_)
                         seriesdict["Sequence"].append(sequence_)
                         seriesdict["Version"].append(version_)
