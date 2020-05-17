@@ -8,7 +8,9 @@ import h5py
 from fuzzysearch import find_near_matches
 from fuzzywuzzy import fuzz
 import operator
-
+import dask.dataframe as dd
+import dask.multiprocessing
+import dask.threaded
 
 class TOOLS:
 
@@ -61,16 +63,17 @@ class PCR(object):
 
     def __init__(self, primer_df, sequence_df):
         self.primers = primer_df
-        self.sequences = sequence_df.values
+        self.sequences = sequence_df
 
     # @jit(nopython=False, parallel = True)
     def analyse_primers(self,
-                        memsave=False,
-                        tempdir="./tmp/",
-                        fname="PCRBenchmark.h5",
-                        deletions=2,
-                        insertions=0,
-                        substitutions=2):
+                        memsave = False,
+                        tempdir = "./tmp/",
+                        fname = "PCRBenchmark.h5",
+                        deletions = 2,
+                        insertions = 0,
+                        substitutions = 2,
+                        nCores = 2):
 
         self.memsave = memsave
         self.tempdir = tempdir
@@ -78,6 +81,7 @@ class PCR(object):
         self.deletions = deletions
         self.instertions = insertions
         self.substitutions = substitutions
+        self.nCores = nCores
 
         unique_groups = self.primers["ID"].unique()
         col_list = ["F Primer Name",
@@ -109,77 +113,83 @@ class PCR(object):
                             format="table",
                             data_columns=True)
             # del bench_df
+
+        # ugly
+        def helper(sequences, Fs, Rs, df_dict_, col_list):
+            df_dict = df_dict_
+            for f in Fs:
+                for r in Rs:
+                    header = sequences[0]
+                    f_name = f[2]
+                    r_name = r[2]
+                    f_ver = f[5]
+                    r_ver = r[5]
+                    f_res = TOOLS.match_fuzzily(f_ver, sequences[1])
+                    r_res = TOOLS.match_fuzzily(r_ver, sequences[2])
+
+                    if type(f_res) == type(tuple()):
+                        start = f_res[0]
+                        f_match = f_ver
+
+                    elif f_res == None:
+                        start = None
+                        f_match = ""
+
+                    else:
+                        start = f_res.start
+                        f_match = f_res.matched
+
+                    if type(r_res) == type(tuple()):
+                        r_start = r_res[0]
+                        end = (len(sequences[1]) - 1) - r_start
+                        r_match = r_ver
+
+                    elif r_res == None:
+                        end = None
+                        r_match = ""
+                    else:
+                        end = (len(sequences[1]) - 1) - r_res.start
+                        r_match = r_res.matched
+
+                    if start == None or end == None:
+                        amplicon = ""
+                        amplicon_length = 0
+
+                    else:
+                        amplicon = sequences[1][start:end]
+                        amplicon_length = len(amplicon)
+
+                    PPC = TOOLS.calculate_PPC(F_primer = f_ver,
+                                                F_match = f_match,
+                                                R_primer = r_ver,
+                                                R_match = r_match)
+
+                    df_dict["F Primer Name"].append(f_name)
+                    df_dict["F Primer Version"].append(f_ver)
+                    df_dict["R Primer Name"].append(r_name)
+                    df_dict["R Primer Version"].append(r_ver)
+                    df_dict["Sequence Header"].append(header)
+                    df_dict["Amplicon Sense"].append(amplicon)
+                    df_dict["Amplicon Sense Length"].append(amplicon_length)
+                    df_dict["Amplicon Sense Start"].append(start)
+                    df_dict["Amplicon Sense End"].append(end)
+                    df_dict["PPC"].append(PPC)
+                    df = pd.DataFrame(df_dict, columns = col_list)
+            return df
+
+
         for group in unique_groups:
-            print("Processing group {} against {} sequences".format(
-                group, self.sequences.shape[0]))
-            Fs = self.primers.loc[(self.primers["ID"] == group) & (
-                self.primers["Type"] == "F"), :].values
-            Rs = self.primers.loc[(self.primers["ID"] == group) & (
-                self.primers["Type"] == "R"), :].values
-            df_dict = dict((key, []) for key in col_list)
-            for row in trange(self.sequences.shape[0]):  # prange
-                for f in Fs:
-                    for r in Rs:
-                        header = self.sequences[row, 0]
-                        f_name = f[2]
-                        r_name = r[2]
-                        f_ver = f[5]
-                        r_ver = r[5]
-                        f_res = TOOLS.match_fuzzily(
-                            f_ver, self.sequences[row, 1])
-                        r_res = TOOLS.match_fuzzily(
-                            r_ver, self.sequences[row, 2])
+            print("Processing group {} against {} sequences".format(group, self.sequences.shape[0]))
+            Fs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "F"),:].values
+            Rs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "R"),:].values
+            df_dict = dict((key,[]) for key in col_list)
 
-                        if type(f_res) == type(tuple()):
-                            start = f_res[0]
-                            f_match = f_ver
+            dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
+            df_series = dsequences.map_partitions(
+                lambda df: df.apply(
+                    lambda x: helper(x, Fs, Rs, df_dict, col_list), axis=1), meta=('df', None)).compute(scheduler='threads')
 
-                        elif f_res == None:
-                            start = None
-                            f_match = ""
-
-                        else:
-                            start = f_res.start
-                            f_match = f_res.matched
-
-                        if type(r_res) == type(tuple()):
-                            r_start = r_res[0]
-                            end = len(self.sequences[row, 1]) - r_start
-                            r_match = r_ver
-
-                        elif r_res == None:
-                            end = None
-                            r_match = ""
-                        else:
-                            end = len(self.sequences[row, 1]) - r_res.start
-                            r_match = r_res.matched
-
-                        if start == None or end == None:
-                            amplicon = ""
-                            amplicon_length = 0
-
-                        else:
-                            amplicon = self.sequences[row, 1][start:end]
-                            amplicon_length = len(amplicon)
-
-                        PPC = TOOLS.calculate_PPC(F_primer=f_ver,
-                                                  F_match=f_match,
-                                                  R_primer=r_ver,
-                                                  R_match=r_match)
-
-                        df_dict["F Primer Name"].append(f_name)
-                        df_dict["F Primer Version"].append(f_ver)
-                        df_dict["R Primer Name"].append(r_name)
-                        df_dict["R Primer Version"].append(r_ver)
-                        df_dict["Sequence Header"].append(header)
-                        df_dict["Amplicon Sense"].append(amplicon)
-                        df_dict["Amplicon Sense Length"].append(
-                            amplicon_length)
-                        df_dict["Amplicon Sense Start"].append(start)
-                        df_dict["Amplicon Sense End"].append(end)
-                        df_dict["PPC"].append(PPC)
-
-            group_df = pd.DataFrame(df_dict, columns=col_list)
+            group_df = pd.concat(df_series.tolist())
             # group_df.to_csv("{}.csv".format(group), index = False)
 
             v_stats = dict((key, []) for key in summary_col_list)
