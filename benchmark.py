@@ -115,8 +115,8 @@ class PCR(object):
             # del bench_df
 
         # ugly
-        def helper(sequences, Fs, Rs, df_dict_, col_list):
-            df_dict = df_dict_
+        def helper(sequences, Fs, Rs, col_list):
+            df = pd.DataFrame(columns = col_list)
             for f in Fs:
                 for r in Rs:
                     header = sequences[0]
@@ -164,32 +164,21 @@ class PCR(object):
                                                 R_primer = r_ver,
                                                 R_match = r_match)
 
-                    df_dict["F Primer Name"].append(f_name)
-                    df_dict["F Primer Version"].append(f_ver)
-                    df_dict["R Primer Name"].append(r_name)
-                    df_dict["R Primer Version"].append(r_ver)
-                    df_dict["Sequence Header"].append(header)
-                    df_dict["Amplicon Sense"].append(amplicon)
-                    df_dict["Amplicon Sense Length"].append(amplicon_length)
-                    df_dict["Amplicon Sense Start"].append(start)
-                    df_dict["Amplicon Sense End"].append(end)
-                    df_dict["PPC"].append(PPC)
-                    df = pd.DataFrame(df_dict, columns = col_list)
+                    df.loc[len(df)] = [f_name, f_ver, r_name, r_ver, header, amplicon, amplicon_length, start, end, PPC]
             return df
-
 
         for group in unique_groups:
             print("Processing group {} against {} sequences".format(group, self.sequences.shape[0]))
             Fs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "F"),:].values
             Rs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "R"),:].values
-            df_dict = dict((key,[]) for key in col_list)
 
             dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
             df_series = dsequences.map_partitions(
                 lambda df: df.apply(
-                    lambda x: helper(x, Fs, Rs, df_dict, col_list), axis=1), meta=('df', None)).compute(scheduler='threads')
+                    lambda x: helper(x, Fs, Rs, col_list), axis=1), meta=('df', None)).compute(scheduler='threads')
 
             group_df = pd.concat(df_series.tolist())
+
             # group_df.to_csv("{}.csv".format(group), index = False)
 
             v_stats = dict((key, []) for key in summary_col_list)
