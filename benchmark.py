@@ -141,14 +141,14 @@ class PCR(object):
 
                         if type(r_res) == type(tuple()):
                             r_start = r_res[0]
-                            end = (len(self.sequences[row,1]) - 1) - r_start
+                            end = len(self.sequences[row,1]) - r_start
                             r_match = r_ver
 
                         elif r_res == None:
                             end = None
                             r_match = ""
                         else:
-                            end = (len(self.sequences[row,1]) - 1) - r_res.start
+                            end = len(self.sequences[row,1]) - r_res.start
                             r_match = r_res.matched
 
                         if start == None or end == None:
