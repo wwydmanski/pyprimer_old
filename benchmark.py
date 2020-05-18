@@ -4,6 +4,7 @@ import numpy as np
 import os
 from numba import jit, prange
 from tqdm import trange
+from tqdm import tqdm
 import h5py
 from fuzzysearch import find_near_matches
 from fuzzywuzzy import fuzz
@@ -11,6 +12,8 @@ import operator
 import dask.dataframe as dd
 import dask.multiprocessing
 import dask.threaded
+import sys
+import time
 
 class TOOLS:
 
@@ -50,8 +53,11 @@ class TOOLS:
         Fm = np.round((fuzz.ratio(F_primer, F_match) / 100) * Fl)
         Rl = float(len(R_primer))
         Rm = np.round((fuzz.ratio(R_primer, R_match) / 100) * Rl)
-        sigma_m = np.std([Fm, Rm])
-        mi_m = np.mean([Fm, Rm])
+        sigma_m = np.std([Fm,Rm])
+        mi_m = np.mean([Fm,Rm])
+        if mi_m == 0:
+            PPC = 0
+            return PPC
         CV_m = sigma_m / mi_m
         PPC = (Fm/Fl) * (Rm/Rl) * (1-CV_m)
         if PPC == np.nan:
@@ -167,47 +173,46 @@ class PCR(object):
                     df.loc[len(df)] = [f_name, f_ver, r_name, r_ver, header, amplicon, amplicon_length, start, end, PPC]
             return df
 
-        for group in unique_groups:
-            print("Processing group {} against {} sequences".format(group, self.sequences.shape[0]))
-            Fs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "F"),:].values
-            Rs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "R"),:].values
+        with tqdm(total=100, file=sys.stdout) as pbar:
+            for group in unique_groups:
+                print("Processing group {} against {} sequences".format(group, self.sequences.shape[0]))
+                Fs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "F"),:].values
+                Rs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "R"),:].values
 
-            dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
-            df_series = dsequences.map_partitions(
-                lambda df: df.apply(
-                    lambda x: helper(x, Fs, Rs, col_list), axis=1), meta=('df', None)).compute(scheduler='threads')
+                dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
+                df_series = dsequences.map_partitions(
+                    lambda df: df.apply(
+                        lambda x: helper(x, Fs, Rs, col_list), axis=1), meta=('df', None)).compute(scheduler='processes')
 
-            group_df = pd.concat(df_series.tolist())
+                group_df = pd.concat(df_series.tolist())
 
-            # group_df.to_csv("{}.csv".format(group), index = False)
+                # group_df.to_csv("{}.csv".format(group), index = False)
 
-            v_stats = dict((key, []) for key in summary_col_list)
-            for fversion in group_df["F Primer Version"].unique():
-                for rversion in group_df["R Primer Version"].unique():
-                    mean_ppc = group_df.loc[(group_df["F Primer Version"] == fversion) & (
-                        group_df["R Primer Version"] == rversion), "PPC"].mean()
-                    seqs_matched = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (
-                        group_df["R Primer Version"] == rversion) & (group_df["Amplicon Sense Length"] != 0), "Amplicon Sense Length"])
-                    n_seqs = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (
-                        group_df["R Primer Version"] == rversion), "Amplicon Sense Length"])
-                    v_stats["Primer Group"].append(group)
-                    v_stats["F Version"].append(fversion)
-                    v_stats["R Version"].append(rversion)
-                    v_stats["Mean PPC"].append(mean_ppc)
-                    v_stats["Sequences matched(%)"].append(
-                        (seqs_matched / n_seqs)*100)
-            group_stats = pd.DataFrame(v_stats, columns=summary_col_list)
-            # group_stats.to_csv("{}_stats.csv".format(group), index = False)
-            summary = summary.append(group_stats)
+                v_stats = dict((key,[]) for key in summary_col_list)
+                for fversion in group_df["F Primer Version"].unique():
+                    for rversion in group_df["R Primer Version"].unique():
+                        mean_ppc = group_df.loc[(group_df["F Primer Version"] == fversion) & (group_df["R Primer Version"] == rversion), "PPC"].mean()
+                        seqs_matched = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (group_df["R Primer Version"] == rversion) & (group_df["Amplicon Sense Length"] != 0), "Amplicon Sense Length"])
+                        n_seqs = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (group_df["R Primer Version"] == rversion), "Amplicon Sense Length"])
+                        v_stats["Primer Group"].append(group)
+                        v_stats["F Version"].append(fversion)
+                        v_stats["R Version"].append(rversion)
+                        v_stats["Mean PPC"].append(mean_ppc)
+                        v_stats["Sequences matched(%)"].append((seqs_matched / n_seqs)*100)
+                group_stats = pd.DataFrame(v_stats, columns = summary_col_list)
+                # group_stats.to_csv("{}_stats.csv".format(group), index = False)
+                summary = summary.append(group_stats)
 
-            if self.memsave:
-                group_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
-                                key=group,
-                                mode="a",
-                                format="table",
-                                data_columns=True)
-            else:
-                self.bench = self.bench.append(group_df)
+                if self.memsave:
+                    group_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
+                                    key = group,
+                                    mode = "a",
+                                    format = "table",
+                                    data_columns = True)
+                else:
+                    self.bench = self.bench.append(group_df)
+                pbar.update(1/len(unique_groups)*100)
+
         if self.memsave:
             print("Extended benchmark results were written to {}".format(
                 os.path.join(self.tempdir, "PCRBenchmark.h5")))
