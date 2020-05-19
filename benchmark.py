@@ -123,7 +123,7 @@ class PCR(object):
             # del bench_df
 
         # ugly
-        def helper(sequences, Fs, Rs, col_list):
+        def helper(sequences, Fs, Rs, col_list, deletions = 1, insertions = 0, substitutions = 2):
             df = pd.DataFrame(columns = col_list)
             for f in Fs:
                 for r in Rs:
@@ -132,8 +132,8 @@ class PCR(object):
                     r_name = r[2]
                     f_ver = f[5]
                     r_ver = r[5]
-                    f_res = TOOLS.match_fuzzily(f_ver, sequences[1])
-                    r_res = TOOLS.match_fuzzily(r_ver, sequences[2])
+                    f_res = TOOLS.match_fuzzily(f_ver, sequences[1], deletions, insertions, substitutions)
+                    r_res = TOOLS.match_fuzzily(r_ver, sequences[2], deletions, insertions, substitutions)
 
                     if type(f_res) == type(tuple()):
                         start = f_res[0]
@@ -184,7 +184,7 @@ class PCR(object):
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
                     lambda df: df.apply(
-                        lambda x: helper(x, Fs, Rs, col_list), axis=1), meta=('df', None)).compute(scheduler='processes')
+                        lambda x: helper(x, Fs, Rs, col_list, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
 
@@ -213,6 +213,7 @@ class PCR(object):
                     for i in range(len(col_list)-1):
                         group_df[col_list[i]] = group_df[col_list[i]].astype(str)
 
+                    group_df[col_list[len(col_list)-1]] = group_df[col_list[len(col_list)-1]].astype(float)
                     warnings.filterwarnings('ignore', category=tables.NaturalNameWarning)
 
                     group_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
