@@ -14,6 +14,8 @@ import dask.multiprocessing
 import dask.threaded
 import sys
 import time
+import tables
+import warnings
 
 class TOOLS:
 
@@ -186,6 +188,7 @@ class PCR(object):
 
                 group_df = pd.concat(df_series.tolist())
 
+
                 # group_df.to_csv("{}.csv".format(group), index = False)
 
                 v_stats = dict((key,[]) for key in summary_col_list)
@@ -204,6 +207,14 @@ class PCR(object):
                 summary = summary.append(group_stats)
 
                 if self.memsave:
+                    # extra weird fix for this problem:
+                    # https://stackoverflow.com/questions/60677863/python-pandas-append-dataframe-with-array-content-to-hdf-file
+                    # https://mlog.club/article/5501050
+                    for i in range(len(col_list)-1):
+                        group_df[col_list[i]] = group_df[col_list[i]].astype(str)
+
+                    warnings.filterwarnings('ignore', category=tables.NaturalNameWarning)
+
                     group_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
                                     key = group,
                                     mode = "a",
