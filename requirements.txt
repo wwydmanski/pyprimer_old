@@ -15,3 +15,7 @@ pytz==2020.1
 six==1.14.0
 tables==3.6.1
 wincertstore==0.2
+dask==2.16.0
+toolz==0.10.0
+fsspec==0.7.3
+cloudpickle==1.4.1
