@@ -17,6 +17,7 @@ import time
 import tables
 import warnings
 
+
 class TOOLS:
 
     def match_fuzzily(pattern_,
@@ -55,8 +56,8 @@ class TOOLS:
         Fm = np.round((fuzz.ratio(F_primer, F_match) / 100) * Fl)
         Rl = float(len(R_primer))
         Rm = np.round((fuzz.ratio(R_primer, R_match) / 100) * Rl)
-        sigma_m = np.std([Fm,Rm])
-        mi_m = np.mean([Fm,Rm])
+        sigma_m = np.std([Fm, Rm])
+        mi_m = np.mean([Fm, Rm])
         if mi_m == 0:
             PPC = 0
             return PPC
@@ -75,13 +76,13 @@ class PCR(object):
 
     # @jit(nopython=False, parallel = True)
     def analyse_primers(self,
-                        memsave = False,
-                        tempdir = "./tmp/",
-                        fname = "PCRBenchmark.h5",
-                        deletions = 2,
-                        insertions = 0,
-                        substitutions = 2,
-                        nCores = 2):
+                        memsave=False,
+                        tempdir="./tmp/",
+                        fname="PCRBenchmark.h5",
+                        deletions=2,
+                        insertions=0,
+                        substitutions=2,
+                        nCores=2):
 
         self.memsave = memsave
         self.tempdir = tempdir
@@ -123,8 +124,8 @@ class PCR(object):
             # del bench_df
 
         # ugly
-        def helper(sequences, Fs, Rs, col_list, deletions = 1, insertions = 0, substitutions = 2):
-            df = pd.DataFrame(columns = col_list)
+        def helper(sequences, Fs, Rs, col_list, deletions=1, insertions=0, substitutions=2):
+            df = pd.DataFrame(columns=col_list)
             for f in Fs:
                 for r in Rs:
                     header = sequences[0]
@@ -132,8 +133,10 @@ class PCR(object):
                     r_name = r[2]
                     f_ver = f[5]
                     r_ver = r[5]
-                    f_res = TOOLS.match_fuzzily(f_ver, sequences[1], deletions, insertions, substitutions)
-                    r_res = TOOLS.match_fuzzily(r_ver, sequences[2], deletions, insertions, substitutions)
+                    f_res = TOOLS.match_fuzzily(
+                        f_ver, sequences[1], deletions, insertions, substitutions)
+                    r_res = TOOLS.match_fuzzily(
+                        r_ver, sequences[2], deletions, insertions, substitutions)
 
                     if type(f_res) == type(tuple()):
                         start = f_res[0]
@@ -167,19 +170,23 @@ class PCR(object):
                         amplicon = sequences[1][start:end]
                         amplicon_length = len(amplicon)
 
-                    PPC = TOOLS.calculate_PPC(F_primer = f_ver,
-                                                F_match = f_match,
-                                                R_primer = r_ver,
-                                                R_match = r_match)
+                    PPC = TOOLS.calculate_PPC(F_primer=f_ver,
+                                              F_match=f_match,
+                                              R_primer=r_ver,
+                                              R_match=r_match)
 
-                    df.loc[len(df)] = [f_name, f_ver, r_name, r_ver, header, amplicon, amplicon_length, start, end, PPC]
+                    df.loc[len(df)] = [f_name, f_ver, r_name, r_ver,
+                                       header, amplicon, amplicon_length, start, end, PPC]
             return df
 
         with tqdm(total=100, file=sys.stdout) as pbar:
             for group in unique_groups:
-                print("Processing group {} against {} sequences".format(group, self.sequences.shape[0]))
-                Fs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "F"),:].values
-                Rs = self.primers.loc[(self.primers["ID"] == group) & (self.primers["Type"] == "R"),:].values
+                print("Processing group {} against {} sequences".format(
+                    group, self.sequences.shape[0]))
+                Fs = self.primers.loc[(self.primers["ID"] == group) & (
+                    self.primers["Type"] == "F"), :].values
+                Rs = self.primers.loc[(self.primers["ID"] == group) & (
+                    self.primers["Type"] == "R"), :].values
 
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
@@ -188,21 +195,24 @@ class PCR(object):
 
                 group_df = pd.concat(df_series.tolist())
 
-
                 # group_df.to_csv("{}.csv".format(group), index = False)
 
-                v_stats = dict((key,[]) for key in summary_col_list)
+                v_stats = dict((key, []) for key in summary_col_list)
                 for fversion in group_df["F Primer Version"].unique():
                     for rversion in group_df["R Primer Version"].unique():
-                        mean_ppc = group_df.loc[(group_df["F Primer Version"] == fversion) & (group_df["R Primer Version"] == rversion), "PPC"].mean()
-                        seqs_matched = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (group_df["R Primer Version"] == rversion) & (group_df["Amplicon Sense Length"] != 0), "Amplicon Sense Length"])
-                        n_seqs = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (group_df["R Primer Version"] == rversion), "Amplicon Sense Length"])
+                        mean_ppc = group_df.loc[(group_df["F Primer Version"] == fversion) & (
+                            group_df["R Primer Version"] == rversion), "PPC"].mean()
+                        seqs_matched = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (
+                            group_df["R Primer Version"] == rversion) & (group_df["Amplicon Sense Length"] != 0), "Amplicon Sense Length"])
+                        n_seqs = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (
+                            group_df["R Primer Version"] == rversion), "Amplicon Sense Length"])
                         v_stats["Primer Group"].append(group)
                         v_stats["F Version"].append(fversion)
                         v_stats["R Version"].append(rversion)
                         v_stats["Mean PPC"].append(mean_ppc)
-                        v_stats["Sequences matched(%)"].append((seqs_matched / n_seqs)*100)
-                group_stats = pd.DataFrame(v_stats, columns = summary_col_list)
+                        v_stats["Sequences matched(%)"].append(
+                            (seqs_matched / n_seqs)*100)
+                group_stats = pd.DataFrame(v_stats, columns=summary_col_list)
                 # group_stats.to_csv("{}_stats.csv".format(group), index = False)
                 summary = summary.append(group_stats)
 
@@ -211,16 +221,19 @@ class PCR(object):
                     # https://stackoverflow.com/questions/60677863/python-pandas-append-dataframe-with-array-content-to-hdf-file
                     # https://mlog.club/article/5501050
                     for i in range(len(col_list)-1):
-                        group_df[col_list[i]] = group_df[col_list[i]].astype(str)
+                        group_df[col_list[i]
+                                 ] = group_df[col_list[i]].astype(str)
 
-                    group_df[col_list[len(col_list)-1]] = group_df[col_list[len(col_list)-1]].astype(float)
-                    warnings.filterwarnings('ignore', category=tables.NaturalNameWarning)
+                    group_df[col_list[len(
+                        col_list)-1]] = group_df[col_list[len(col_list)-1]].astype(float)
+                    warnings.filterwarnings(
+                        'ignore', category=tables.NaturalNameWarning)
 
                     group_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
-                                    key = group,
-                                    mode = "a",
-                                    format = "table",
-                                    data_columns = True)
+                                    key=group,
+                                    mode="a",
+                                    format="table",
+                                    data_columns=True)
                 else:
                     self.bench = self.bench.append(group_df)
                 pbar.update(1/len(unique_groups)*100)
@@ -230,4 +243,3 @@ class PCR(object):
                 os.path.join(self.tempdir, "PCRBenchmark.h5")))
         self.summary = summary
     # def analyse_probes(self, memsave = False, tempdir = "./tmp/")
-
