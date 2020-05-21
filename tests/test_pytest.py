@@ -1,4 +1,4 @@
-from pyprimer.modules.PPC import PPC
+from pyprimer.modules import PPC
 from pyprimer.utils.sequence import PCRPrimer
 from pyprimer.utils.sequence import Sequence
 import pandas as pd
