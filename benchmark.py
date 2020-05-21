@@ -88,7 +88,7 @@ class PCR(object):
         self.tempdir = tempdir
         self.fname = fname
         self.deletions = deletions
-        self.instertions = insertions
+        self.insertions = insertions
         self.substitutions = substitutions
         self.nCores = nCores
 
@@ -124,7 +124,7 @@ class PCR(object):
             # del bench_df
 
         # ugly
-        def helper(sequences, Fs, Rs, col_list, deletions=1, insertions=0, substitutions=2):
+        def helper(sequences, Fs, Rs, col_list, deletions=0, insertions=0, substitutions=2):
             df = pd.DataFrame(columns=col_list)
             for f in Fs:
                 for r in Rs:
