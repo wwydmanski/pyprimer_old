@@ -77,7 +77,7 @@ class PPC(object):
                     if type(f_res) == type(tuple()):
                         start = f_res[0]
                         f_match = f_ver
-                    elif f_res == None:
+                    elif f_res is None:
                         start = None
                         f_match = ""
                     else:
@@ -88,14 +88,14 @@ class PPC(object):
                         r_start = r_res[0]
                         end = (len(sequences[1]) - 1) - r_start
                         r_match = r_ver
-                    elif r_res == None:
+                    elif r_res is None:
                         end = None
                         r_match = ""
                     else:
                         end = (len(sequences[1]) - 1) - r_res.start
                         r_match = r_res.matched
 
-                    if start == None or end == None:
+                    if start is None or end is None:
                         amplicon = ""
                         amplicon_length = 0
                     else:
@@ -111,12 +111,14 @@ class PPC(object):
                                        header, amplicon, amplicon_length, start, end, PPC]
             return df
 
-        with tqdm(total=100, file=sys.stdout) as pbar:
-            for group in unique_groups:
-                Fs = self.primers.loc[(self.primers["ID"] == group) & (
-                    self.primers["Type"] == "F"), :].values
-                Rs = self.primers.loc[(self.primers["ID"] == group) & (
-                    self.primers["Type"] == "R"), :].values
+        with tqdm(unique_groups) as pbar:
+            for group in pbar:
+                filter_group = self.primers["ID"] == group
+                filter_forward = self.primers["Type"] == "F"
+                filter_reverse = self.primers["Type"] == "R"
+
+                Fs = self.primers.loc[filter_group & filter_forward].values
+                Rs = self.primers.loc[filter_group & filter_reverse].values
 
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
@@ -128,12 +130,15 @@ class PPC(object):
                 v_stats = dict((key, []) for key in self.SUMMARY_COL_LIST)
                 for fversion in group_df["F Primer Version"].unique():
                     for rversion in group_df["R Primer Version"].unique():
-                        mean_ppc = group_df.loc[(group_df["F Primer Version"] == fversion) & (
-                            group_df["R Primer Version"] == rversion), "PPC"].mean()
-                        seqs_matched = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (
-                            group_df["R Primer Version"] == rversion) & (group_df["Amplicon Sense Length"] != 0), "Amplicon Sense Length"])
-                        n_seqs = len(group_df.loc[(group_df["F Primer Version"] == fversion) & (
-                            group_df["R Primer Version"] == rversion), "Amplicon Sense Length"])
+                        filter_r_version = (group_df["R Primer Version"] == rversion)
+                        filter_f_version = (group_df["F Primer Version"] == fversion)
+                        filter_matching = filter_r_version & filter_f_version
+                        
+                        n_seqs = np.sum(filter_matching)
+                        seqs_matched = np.sum(filter_matching & (group_df["Amplicon Sense Length"] != 0))
+
+                        mean_ppc = group_df.loc[filter_matching, "PPC"].mean()
+                        
                         v_stats["Primer Group"].append(group)
                         v_stats["F Version"].append(fversion)
                         v_stats["R Version"].append(rversion)
@@ -147,7 +152,6 @@ class PPC(object):
                     self._saver.save_group(group_df, group)
                 else:
                     bench_df = bench_df.append(group_df)
-                pbar.update(1/len(unique_groups)*100)
 
         if self.memsave:
             print("Extended benchmark results were written to {}".format(
