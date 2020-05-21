@@ -11,5 +11,5 @@ if __name__ == "__main__":
     test_sequence.DescribeSequences(f"{data_dir}/merged.fasta")
     
     test_pcr = PPC(test_primer.dataframe, test_sequence.dataframe.sample(100))
-    test_pcr.analyse_primers(nCores=8, deletions=1, insertions=0, substitutions=2)
-    test_pcr.summary.to_csv("summary_df.csv", index = False)
+    summary = test_pcr.analyse_primers(nCores=8, deletions=1, insertions=0, substitutions=2)
+    summary.to_csv("summary_df.csv", index = False)
