@@ -68,7 +68,7 @@ class TOOLS:
         return PPC
 
 
-class PCR(object):
+class PPC(object):
 
     def __init__(self, primer_df, sequence_df):
         self.primers = primer_df

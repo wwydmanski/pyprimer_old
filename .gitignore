@@ -1,9 +1,0 @@
-build/
-data/
-dist/
-primers_test_df.csv
-sequence_test_df.csv
-unit_test.py
-pyprimer.egg-info/*
-__pycache__/*
-utils/__pycache__/*

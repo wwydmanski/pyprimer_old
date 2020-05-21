@@ -55,6 +55,7 @@ class ESSENTIALS:
         gc = sequence.count("G") + sequence.count("C")
         gc_content = gc / len(sequence)
         return gc_content * 100
+        
     def Tm(seq,
            GC,
            Na = 50,
@@ -638,10 +639,4 @@ if __name__ == "__main__":
     test_sequence.DescribeSequences("./data/merged.fasta")
     test_primer.dataframe.to_csv("primers_test_df.csv",index = False)
     test_sequence.dataframe.to_csv("sequence_test_df.csv", index = False)
-
-
-                
-                
-
-            
 
