@@ -21,14 +21,13 @@ def test_PPC_calculation():
 
 
 def test_PPC_temp_memory():
-
     test_primer = PCRPrimer("directory")
     test_primer.DescribePrimers(f"{data_dir}/primers")
     test_sequence = Sequence("fasta")
     test_sequence.DescribeSequences(f"{data_dir}/merged.fasta")
     
-    test_pcr = PPC(test_primer.dataframe, test_sequence.dataframe.sample(100, random_state=42))
-    _ = test_pcr.analyse_primers(memsave=True, tempdir="tests/test_tmp", nCores=8, deletions=1, insertions=0, substitutions=2)
+    test_pcr = PPC(test_primer.dataframe, test_sequence.dataframe.sample(100, random_state=42), memsave=True, tempdir="tests/test_tmp")
+    _ = test_pcr.analyse_primers(nCores=8, deletions=1, insertions=0, substitutions=2)
 
     for key in h5py.File("tests/goal_tmp/PCRBenchmark.h5", "r").keys():
         goal_df = pd.read_hdf("tests/goal_tmp/PCRBenchmark.h5", key=key)

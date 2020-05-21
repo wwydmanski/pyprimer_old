@@ -68,45 +68,70 @@ class TOOLS:
 
 
 class _MemSaver:
-    def __init__(self, tempdir, fname):
+    def __init__(self, tempdir, fname, col_list):
         self.tempdir = tempdir
         self.fname = fname
-        
-        os.makedirs(tempdir, exist_ok=True)
-        bench_df.to_hdf(path_or_buf=os.path.join(tempdir, fname),
+        self.col_list = col_list
+
+    def initialize(self, bench_df):
+        os.makedirs(self.tempdir, exist_ok=True)
+        bench_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
                         key="bench",
                         mode="w",
                         format="table",
                         data_columns=True)
+    
+    def save_group(self, group_df, key):
+        # extra weird fix for this problem:
+        # https://stackoverflow.com/questions/60677863/python-pandas-append-dataframe-with-array-content-to-hdf-file
+        # https://mlog.club/article/5501050
+        for i in range(len(self.col_list)-1):
+            group_df[self.col_list[i]
+                        ] = group_df[self.col_list[i]].astype(str)
 
+        group_df[self.col_list[len(
+            self.col_list)-1]] = group_df[self.col_list[len(self.col_list)-1]].astype(float)
+        warnings.filterwarnings(
+            'ignore', category=tables.NaturalNameWarning)
+
+        group_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
+                        key=key,
+                        mode="a",
+                        format="table",
+                        data_columns=True)
 
 class PPC(object):
+    COL_LIST = ["F Primer Name",
+                "F Primer Version",
+                "R Primer Name",
+                "R Primer Version",
+                "Sequence Header",
+                "Amplicon Sense",
+                "Amplicon Sense Length",
+                "Amplicon Sense Start",
+                "Amplicon Sense End",
+                "PPC"]
 
-    def __init__(self, primer_df, sequence_df):
-        self.primers = primer_df
-        self.sequences = sequence_df
-
-    def analyse_primers(self,
+    def __init__(self, primer_df, 
+                        sequence_df,
                         memsave=False,
                         tempdir="./tmp/",
-                        fname="PCRBenchmark.h5",
+                        fname="PCRBenchmark.h5"):
+        self.primers = primer_df
+        self.sequences = sequence_df
+        self.memsave = memsave
+        if memsave:
+            self._saver = _MemSaver(tempdir, fname, self.COL_LIST)
+
+    def analyse_primers(self,
                         deletions=0,
                         insertions=0,
                         substitutions=2,
                         nCores=2) -> pd.DataFrame:
 
         unique_groups = self.primers["ID"].unique()
-        col_list = ["F Primer Name",
-                    "F Primer Version",
-                    "R Primer Name",
-                    "R Primer Version",
-                    "Sequence Header",
-                    "Amplicon Sense",
-                    "Amplicon Sense Length",
-                    "Amplicon Sense Start",
-                    "Amplicon Sense End",
-                    "PPC"]
-        bench_df = pd.DataFrame(columns=col_list)
+
+        bench_df = pd.DataFrame(columns=self.COL_LIST)
 
         summary_col_list = ["Primer Group",
                             "F Version",
@@ -115,17 +140,12 @@ class PPC(object):
                             "Sequences matched(%)"]
         summary = pd.DataFrame(columns=summary_col_list)
 
-        if memsave:
-            os.makedirs(tempdir, exist_ok=True)
-            bench_df.to_hdf(path_or_buf=os.path.join(tempdir, fname),
-                            key="bench",
-                            mode="w",
-                            format="table",
-                            data_columns=True)
+        if self.memsave:
+            self._saver.initialize(bench_df)
 
         # ugly
-        def helper(sequences, Fs, Rs, col_list, deletions=0, insertions=0, substitutions=2):
-            df = pd.DataFrame(columns=col_list)
+        def helper(sequences, Fs, Rs, COL_LIST, deletions=0, insertions=0, substitutions=2):
+            df = pd.DataFrame(columns=self.COL_LIST)
             for f in Fs:
                 for r in Rs:
                     header = sequences[0]
@@ -191,7 +211,7 @@ class PPC(object):
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
                     lambda df: df.apply(
-                        lambda x: helper(x, Fs, Rs, col_list, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
+                        lambda x: helper(x, Fs, Rs, self.COL_LIST, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
 
@@ -216,30 +236,14 @@ class PPC(object):
                 # group_stats.to_csv("{}_stats.csv".format(group), index = False)
                 summary = summary.append(group_stats)
 
-                if memsave:
-                    # extra weird fix for this problem:
-                    # https://stackoverflow.com/questions/60677863/python-pandas-append-dataframe-with-array-content-to-hdf-file
-                    # https://mlog.club/article/5501050
-                    for i in range(len(col_list)-1):
-                        group_df[col_list[i]
-                                 ] = group_df[col_list[i]].astype(str)
-
-                    group_df[col_list[len(
-                        col_list)-1]] = group_df[col_list[len(col_list)-1]].astype(float)
-                    warnings.filterwarnings(
-                        'ignore', category=tables.NaturalNameWarning)
-
-                    group_df.to_hdf(path_or_buf=os.path.join(tempdir, fname),
-                                    key=group,
-                                    mode="a",
-                                    format="table",
-                                    data_columns=True)
+                if self.memsave:
+                    self._saver.save_group(group_df, group)
                 else:
                     bench_df = bench_df.append(group_df)
                 pbar.update(1/len(unique_groups)*100)
 
-        if memsave:
+        if self.memsave:
             print("Extended benchmark results were written to {}".format(
-                os.path.join(tempdir, "PCRBenchmark.h5")))
+                os.path.join(self._saver.tempdir, "PCRBenchmark.h5")))
         
         return summary
