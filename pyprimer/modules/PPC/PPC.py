@@ -28,6 +28,12 @@ class PPC(object):
                 "Amplicon Sense End",
                 "PPC"]
 
+    SUMMARY_COL_LIST = ["Primer Group",
+                        "F Version",
+                        "R Version",
+                        "Mean PPC",
+                        "Sequences matched(%)"]
+
     def __init__(self, primer_df, 
                         sequence_df,
                         memsave=False,
@@ -48,19 +54,13 @@ class PPC(object):
         unique_groups = self.primers["ID"].unique()
 
         bench_df = pd.DataFrame(columns=self.COL_LIST)
-
-        summary_col_list = ["Primer Group",
-                            "F Version",
-                            "R Version",
-                            "Mean PPC",
-                            "Sequences matched(%)"]
-        summary = pd.DataFrame(columns=summary_col_list)
+        summary = pd.DataFrame(columns=self.SUMMARY_COL_LIST)
 
         if self.memsave:
             self._saver.initialize(bench_df)
 
         # ugly
-        def helper(sequences, Fs, Rs, COL_LIST, deletions=0, insertions=0, substitutions=2):
+        def helper(sequences, Fs, Rs):
             df = pd.DataFrame(columns=self.COL_LIST)
             for f in Fs:
                 for r in Rs:
@@ -77,11 +77,9 @@ class PPC(object):
                     if type(f_res) == type(tuple()):
                         start = f_res[0]
                         f_match = f_ver
-
                     elif f_res == None:
                         start = None
                         f_match = ""
-
                     else:
                         start = f_res.start
                         f_match = f_res.matched
@@ -90,7 +88,6 @@ class PPC(object):
                         r_start = r_res[0]
                         end = (len(sequences[1]) - 1) - r_start
                         r_match = r_ver
-
                     elif r_res == None:
                         end = None
                         r_match = ""
@@ -101,7 +98,6 @@ class PPC(object):
                     if start == None or end == None:
                         amplicon = ""
                         amplicon_length = 0
-
                     else:
                         amplicon = sequences[1][start:end]
                         amplicon_length = len(amplicon)
@@ -117,8 +113,6 @@ class PPC(object):
 
         with tqdm(total=100, file=sys.stdout) as pbar:
             for group in unique_groups:
-                # print("Processing group {} against {} sequences".format(
-                #     group, self.sequences.shape[0]))
                 Fs = self.primers.loc[(self.primers["ID"] == group) & (
                     self.primers["Type"] == "F"), :].values
                 Rs = self.primers.loc[(self.primers["ID"] == group) & (
@@ -127,13 +121,11 @@ class PPC(object):
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
                     lambda df: df.apply(
-                        lambda x: helper(x, Fs, Rs, self.COL_LIST, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
+                        lambda x: helper(x, Fs, Rs), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
 
-                # group_df.to_csv("{}.csv".format(group), index = False)
-
-                v_stats = dict((key, []) for key in summary_col_list)
+                v_stats = dict((key, []) for key in self.SUMMARY_COL_LIST)
                 for fversion in group_df["F Primer Version"].unique():
                     for rversion in group_df["R Primer Version"].unique():
                         mean_ppc = group_df.loc[(group_df["F Primer Version"] == fversion) & (
@@ -148,8 +140,7 @@ class PPC(object):
                         v_stats["Mean PPC"].append(mean_ppc)
                         v_stats["Sequences matched(%)"].append(
                             (seqs_matched / n_seqs)*100)
-                group_stats = pd.DataFrame(v_stats, columns=summary_col_list)
-                # group_stats.to_csv("{}_stats.csv".format(group), index = False)
+                group_stats = pd.DataFrame(v_stats, columns=self.SUMMARY_COL_LIST)
                 summary = summary.append(group_stats)
 
                 if self.memsave:
