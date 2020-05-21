@@ -22,7 +22,7 @@ class TOOLS:
 
     def match_fuzzily(pattern_,
                       sequence_,
-                      deletions=1,
+                      deletions=0,
                       insertions=0,
                       substitutions=2):
 
@@ -42,8 +42,8 @@ class TOOLS:
                 dist_list = np.ndarray(shape=(len(result),))
                 for i in range(len(result)):
                     dist_list[i] = result[i].dist
-                idx_max = np.where(dist_list == np.max(dist_list))
-                return result[idx_max[1][0]]
+                idx_min = np.where(dist_list == np.min(dist_list))
+                return result[idx_min[0][0]]
 
             elif len(result) == 1:
                 return result[0]
@@ -79,7 +79,7 @@ class PCR(object):
                         memsave=False,
                         tempdir="./tmp/",
                         fname="PCRBenchmark.h5",
-                        deletions=2,
+                        deletions=0,
                         insertions=0,
                         substitutions=2,
                         nCores=2):
@@ -181,8 +181,8 @@ class PCR(object):
 
         with tqdm(total=100, file=sys.stdout) as pbar:
             for group in unique_groups:
-                print("Processing group {} against {} sequences".format(
-                    group, self.sequences.shape[0]))
+                # print("Processing group {} against {} sequences".format(
+                #     group, self.sequences.shape[0]))
                 Fs = self.primers.loc[(self.primers["ID"] == group) & (
                     self.primers["Type"] == "F"), :].values
                 Rs = self.primers.loc[(self.primers["ID"] == group) & (
@@ -191,7 +191,7 @@ class PCR(object):
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
                     lambda df: df.apply(
-                        lambda x: helper(x, Fs, Rs, col_list, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
+                        lambda x: helper(x, Fs, Rs, col_list, self.deletions, self.insertions, self.substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
 
