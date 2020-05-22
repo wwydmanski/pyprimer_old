@@ -87,16 +87,18 @@ class PPC(object):
 
     def helper(self, sequences, Fs, Rs, deletions, insertions, substitutions) -> pd.DataFrame:
         res = []
+        header = sequences[0]
+        
         for f in Fs:
+            f_ver = f[5]
+            f_name = f[2]
+            start, f_match = TOOLS.match_fuzzily(
+                f_ver, sequences[1], deletions, insertions, substitutions)
+
             for r in Rs:
-                header = sequences[0]
-                f_name = f[2]
                 r_name = r[2]
-                f_ver = f[5]
                 r_ver = r[5]
 
-                start, f_match = TOOLS.match_fuzzily(
-                    f_ver, sequences[1], deletions, insertions, substitutions)
                 r_start, r_match = TOOLS.match_fuzzily(
                     r_ver, sequences[2], deletions, insertions, substitutions)
 
