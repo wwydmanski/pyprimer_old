@@ -68,7 +68,7 @@ class PPC(object):
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
                     lambda df: df.apply(
-                        lambda x: self.helper(x, Fs, Rs, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
+                        lambda x: self._calculate_stats(x, Fs, Rs, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
                 v_stats = self._craft_summary(group_df, group)
@@ -85,7 +85,7 @@ class PPC(object):
         
         return summary
 
-    def helper(self, sequences, Fs, Rs, deletions, insertions, substitutions) -> pd.DataFrame:
+    def _calculate_stats(self, sequences, Fs, Rs, deletions, insertions, substitutions) -> pd.DataFrame:
         res = []
         header = sequences[0]
         

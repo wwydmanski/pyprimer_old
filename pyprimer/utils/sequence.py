@@ -5,6 +5,13 @@ import re
 from collections import Counter
 import numpy as np
 from numba import jit
+from enum import Enum
+
+
+class READ_MODES(Enum):
+    CSV = 1
+    FASTA = 2
+    DIRECTORY = 3
 
 class ESSENTIALS:
 
@@ -464,7 +471,8 @@ class PCRPrimer(object):
             'directory' - many fasta files with primers in one directory, that must be separated from directory with sequences
         """
         self.mode = mode
-    def DescribePrimers(self,
+
+    def describe_primers(self,
                         primers_path,
                         Na = 50,
                         K = 0,
@@ -497,17 +505,17 @@ class PCRPrimer(object):
         self.dnac2 = dnac2
         self.salt_correction = salt_correction
 
-        if self.mode == "csv":
+        if self.mode == READ_MODES.CSV:
             #TODO for DataFrame with columns "Header" "Sequence"
             # primers_df = pd.read_csv(primers_path)
             # self.dataframe = primers_df
             raise NotImplementedError("This variant of ReadPrimers method is yet not implemented")
 
-        elif self.mode == "fasta":
+        elif self.mode == READ_MODES.FASTA:
             #TODO for meged fasta file with all primers
             raise NotImplementedError("This variant of ReadPrimers method is yet not implemented")
 
-        elif self.mode == "directory":
+        elif self.mode == READ_MODES.DIRECTORY:
             primers_df = pd.DataFrame(columns=["Origin", "Target", "ID", "Name", "Sequence", "Version", "Type", "Length", "GC(%)", "AT(%)", "Tm"])
             filelist = os.listdir(self.primers_path)
             groups = {}
@@ -586,17 +594,17 @@ class Sequence(object):
     def __init__(self, mode):
         self.mode = mode
     
-    def DescribeSequences(self, seqs_path):
+    def describe_sequences(self, seqs_path):
 
         self.seqs_path = seqs_path
 
-        if self.mode == "csv":
+        if self.mode == READ_MODES.CSV:
             #TODO for DataFrame with columns "Header" "Sequence"
             # seqs_df = pd.read_csv(self.seqs_path)
             # self.dataframe = seqs_df
             raise NotImplementedError("This variant of ReadSequences method is yet not implemented")
 
-        elif self.mode == "fasta":
+        elif self.mode == READ_MODES.FASTA:
             seqs_df = pd.DataFrame(columns = ["Header", "Sense Sequence", "Antisense Sequence", "Length", "N(%)"])
             with open(self.seqs_path, "r") as fh:
                 fasta = fh.read()
@@ -626,7 +634,7 @@ class Sequence(object):
             seqs_df = seqs_df.append(pd.DataFrame(seriesdict))
             self.dataframe = seqs_df
 
-        elif self.mode == "directory":
+        elif self.mode == READ_MODES.DIRECTORY:
             raise NotImplementedError("This variant of ReadSequences method is yet not implemented")
 
         else:
