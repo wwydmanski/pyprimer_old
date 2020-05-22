@@ -45,22 +45,7 @@ class PPC(object):
         if memsave:
             self._saver = _MemSaver(tempdir, fname, self.COL_LIST)
 
-    def analyse_primers(self,
-                        deletions=0,
-                        insertions=0,
-                        substitutions=2,
-                        nCores=2) -> pd.DataFrame:
-
-        unique_groups = self.primers["ID"].unique()
-
-        bench_df = pd.DataFrame(columns=self.COL_LIST)
-        summary = pd.DataFrame(columns=self.SUMMARY_COL_LIST)
-
-        if self.memsave:
-            self._saver.initialize(bench_df)
-
-        # ugly
-        def helper(sequences, Fs, Rs):
+    def helper(self, sequences, Fs, Rs, deletions, insertions, substitutions):
             df = pd.DataFrame(columns=self.COL_LIST)
             for f in Fs:
                 for r in Rs:
@@ -75,11 +60,11 @@ class PPC(object):
                     r_start, r_match = TOOLS.match_fuzzily(
                         r_ver, sequences[2], deletions, insertions, substitutions)
 
-                    if r_start is None:
-                        end = None
-                    else:
+                    try:
                         end = len(sequences[1]) - 1 - r_start
-
+                    except TypeError:
+                        end = None
+                        
                     if start is None or end is None:
                         amplicon = ""
                         amplicon_length = 0
@@ -96,6 +81,20 @@ class PPC(object):
                                        header, amplicon, amplicon_length, start, end, PPC]
             return df
 
+    def analyse_primers(self,
+                        deletions=0,
+                        insertions=0,
+                        substitutions=2,
+                        nCores=2) -> pd.DataFrame:
+
+        unique_groups = self.primers["ID"].unique()
+
+        bench_df = pd.DataFrame(columns=self.COL_LIST)
+        summary = pd.DataFrame(columns=self.SUMMARY_COL_LIST)
+
+        if self.memsave:
+            self._saver.initialize(bench_df)
+
         with tqdm(unique_groups) as pbar:
             for group in pbar:
                 filter_group = self.primers["ID"] == group
@@ -108,7 +107,7 @@ class PPC(object):
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
                     lambda df: df.apply(
-                        lambda x: helper(x, Fs, Rs), axis=1), meta=('df', None)).compute(scheduler='processes')
+                        lambda x: self.helper(x, Fs, Rs, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
 
