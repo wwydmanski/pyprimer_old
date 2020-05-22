@@ -69,31 +69,16 @@ class PPC(object):
                     r_name = r[2]
                     f_ver = f[5]
                     r_ver = r[5]
-                    f_res = TOOLS.match_fuzzily(
+
+                    start, f_match = TOOLS.match_fuzzily(
                         f_ver, sequences[1], deletions, insertions, substitutions)
-                    r_res = TOOLS.match_fuzzily(
+                    r_start, r_match = TOOLS.match_fuzzily(
                         r_ver, sequences[2], deletions, insertions, substitutions)
 
-                    if type(f_res) == type(tuple()):
-                        start = f_res[0]
-                        f_match = f_ver
-                    elif f_res is None:
-                        start = None
-                        f_match = ""
-                    else:
-                        start = f_res.start
-                        f_match = f_res.matched
-
-                    if type(r_res) == type(tuple()):
-                        r_start = r_res[0]
-                        end = (len(sequences[1]) - 1) - r_start
-                        r_match = r_ver
-                    elif r_res is None:
+                    if r_start is None:
                         end = None
-                        r_match = ""
                     else:
-                        end = (len(sequences[1]) - 1) - r_res.start
-                        r_match = r_res.matched
+                        end = len(sequences[1]) - 1 - r_start
 
                     if start is None or end is None:
                         amplicon = ""

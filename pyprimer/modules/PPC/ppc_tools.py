@@ -7,34 +7,27 @@ import tables
 
 
 class TOOLS:
-    def match_fuzzily(pattern_,
-                      sequence_,
+    def match_fuzzily(pattern,
+                      sequence,
                       deletions=0,
                       insertions=0,
                       substitutions=2):
 
-        if pattern_ in sequence_:
-            start = sequence_.index(pattern_)
-            end = start + len(pattern_)
-            return (start, end)
+        if pattern in sequence:
+            start = sequence.index(pattern)
+            # end = start + len(pattern)
+            return start, pattern
         else:
-            result = find_near_matches(pattern_,
-                                       sequence_,
+            result = find_near_matches(pattern,
+                                       sequence,
                                        max_substitutions=substitutions,
                                        max_insertions=insertions,
                                        max_deletions=deletions)
-            if len(result) > 1:
-                dist_list = np.ndarray(shape=(len(result),))
-                for i in range(len(result)):
-                    dist_list[i] = result[i].dist
-                idx_min = np.where(dist_list == np.min(dist_list))
-                return result[idx_min[0][0]]
-
-            elif len(result) == 1:
-                return result[0]
-
+            if len(result) != 0:
+                idx_min = np.argmin([i.dist for i in result])
+                return result[idx_min].start, result[idx_min].matched
             else:
-                return None
+                return None, ""
 
     def calculate_PPC(F_primer, F_match, R_primer, R_match):
         Fl = float(len(F_primer))
