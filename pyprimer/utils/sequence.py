@@ -490,21 +490,6 @@ class PCRPrimer(object):
         """
         Method that reads primers and parse them into dataframe with all the metadata
         """
-        self.Na = Na
-        self.K = K
-        self.Tris = Tris
-        self.Mg = Mg
-        self.dNTPs = dNTPs
-        self.shift = shift
-        self.primers_path = primers_path
-        self.nn_table = nn_table
-        self.tmm_table = tmm_table
-        self.imm_table = imm_table
-        self.de_table = de_table
-        self.dnac1 = dnac1
-        self.dnac2 = dnac2
-        self.salt_correction = salt_correction
-
         if self.mode == READ_MODES.CSV:
             #TODO for DataFrame with columns "Header" "Sequence"
             # primers_df = pd.read_csv(primers_path)
@@ -517,7 +502,7 @@ class PCRPrimer(object):
 
         elif self.mode == READ_MODES.DIRECTORY:
             primers_df = pd.DataFrame(columns=["Origin", "Target", "ID", "Name", "Sequence", "Version", "Type", "Length", "GC(%)", "AT(%)", "Tm"])
-            filelist = os.listdir(self.primers_path)
+            filelist = os.listdir(primers_path)
             groups = {}
             for f in filelist:
                 seriesdict = {"Origin": [],
@@ -532,7 +517,7 @@ class PCRPrimer(object):
                               "AT(%)": [],
                               "Tm": []}
 
-                with open(os.path.join(self.primers_path,f),"r") as fh:
+                with open(os.path.join(primers_path,f),"r") as fh:
                     seqlist = fh.readlines()
 
                 seqlist = [item.strip("\n") for item in seqlist]
@@ -552,7 +537,6 @@ class PCRPrimer(object):
                     length_ = len(seqs[i])
 
                     for version_ in versions:
-                        # print(version_)
                         seriesdict["Origin"].append(origin_[1:])
                         seriesdict["Target"].append(target_)
                         seriesdict["ID"].append("{}_{}".format(origin_[1:],target_))
@@ -566,19 +550,19 @@ class PCRPrimer(object):
 
                         tm_ = ESSENTIALS.Tm(seq = version_,
                                             GC = gc_,
-                                            Na = self.Na,
-                                            K = self.K,
-                                            Tris = self.Tris,
-                                            Mg = self.Mg,
-                                            dNTPs = self.dNTPs,
-                                            shift = self.shift,
-                                            nn_table = self.nn_table,
-                                            tmm_table = self.tmm_table,
-                                            imm_table = self.imm_table,
-                                            de_table = self.de_table,
-                                            dnac1 = self.dnac1,
-                                            dnac2 = self.dnac2,
-                                            salt_correction = self.salt_correction)
+                                            Na = Na,
+                                            K = K,
+                                            Tris = Tris,
+                                            Mg = Mg,
+                                            dNTPs = dNTPs,
+                                            shift = shift,
+                                            nn_table = nn_table,
+                                            tmm_table = tmm_table,
+                                            imm_table = imm_table,
+                                            de_table = de_table,
+                                            dnac1 = dnac1,
+                                            dnac2 = dnac2,
+                                            salt_correction = salt_correction)
                         seriesdict["Tm"].append(tm_)
                         seriesdict["Type"].append(type_)
                         seriesdict["Length"].append(length_)
@@ -586,7 +570,8 @@ class PCRPrimer(object):
             for key, item in groups.items():
                 temp_df = pd.DataFrame(item)
                 primers_df = primers_df.append(temp_df)
-            self.dataframe = primers_df
+            
+            return primers_df
         else:
             raise ValueError("Unspecified {} mode, use 'csv', 'directory' or 'fasta' instead".format(self.mode))
 
@@ -595,9 +580,6 @@ class Sequence(object):
         self.mode = mode
     
     def describe_sequences(self, seqs_path):
-
-        self.seqs_path = seqs_path
-
         if self.mode == READ_MODES.CSV:
             #TODO for DataFrame with columns "Header" "Sequence"
             # seqs_df = pd.read_csv(self.seqs_path)
@@ -606,7 +588,7 @@ class Sequence(object):
 
         elif self.mode == READ_MODES.FASTA:
             seqs_df = pd.DataFrame(columns = ["Header", "Sense Sequence", "Antisense Sequence", "Length", "N(%)"])
-            with open(self.seqs_path, "r") as fh:
+            with open(seqs_path, "r") as fh:
                 fasta = fh.read()
             fastalist = fasta.split("\n>")
             seriesdict = {"Header": [], "Sense Sequence": [], "Antisense Sequence": [], "Length": [], "N(%)": []}
@@ -632,7 +614,8 @@ class Sequence(object):
                     raise KeyError('Unexpected character in {} [index {}]'.format(header, idx))
                 idx += 1
             seqs_df = seqs_df.append(pd.DataFrame(seriesdict))
-            self.dataframe = seqs_df
+
+            return seqs_df
 
         elif self.mode == READ_MODES.DIRECTORY:
             raise NotImplementedError("This variant of ReadSequences method is yet not implemented")
