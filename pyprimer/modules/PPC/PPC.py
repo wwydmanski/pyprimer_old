@@ -45,42 +45,6 @@ class PPC(object):
         if memsave:
             self._saver = _MemSaver(tempdir, fname, self.COL_LIST)
 
-    def helper(self, sequences, Fs, Rs, deletions, insertions, substitutions):
-            df = pd.DataFrame(columns=self.COL_LIST)
-            for f in Fs:
-                for r in Rs:
-                    header = sequences[0]
-                    f_name = f[2]
-                    r_name = r[2]
-                    f_ver = f[5]
-                    r_ver = r[5]
-
-                    start, f_match = TOOLS.match_fuzzily(
-                        f_ver, sequences[1], deletions, insertions, substitutions)
-                    r_start, r_match = TOOLS.match_fuzzily(
-                        r_ver, sequences[2], deletions, insertions, substitutions)
-
-                    try:
-                        end = len(sequences[1]) - 1 - r_start
-                    except TypeError:
-                        end = None
-                        
-                    if start is None or end is None:
-                        amplicon = ""
-                        amplicon_length = 0
-                    else:
-                        amplicon = sequences[1][start:end]
-                        amplicon_length = len(amplicon)
-
-                    PPC = TOOLS.calculate_PPC(F_primer=f_ver,
-                                              F_match=f_match,
-                                              R_primer=r_ver,
-                                              R_match=r_match)
-
-                    df.loc[len(df)] = [f_name, f_ver, r_name, r_ver,
-                                       header, amplicon, amplicon_length, start, end, PPC]
-            return df
-
     def analyse_primers(self,
                         deletions=0,
                         insertions=0,
@@ -121,7 +85,7 @@ class PPC(object):
                         n_seqs = np.sum(filter_matching)
                         seqs_matched = np.sum(filter_matching & (group_df["Amplicon Sense Length"] != 0))
 
-                        mean_ppc = group_df.loc[filter_matching, "PPC"].mean()
+                        mean_ppc = group_df.loc[filter_matching, "PPC"].mean().round(5)
                         
                         v_stats["Primer Group"].append(group)
                         v_stats["F Version"].append(fversion)
@@ -142,3 +106,40 @@ class PPC(object):
                 os.path.join(self._saver.tempdir, "PCRBenchmark.h5")))
         
         return summary
+
+    def helper(self, sequences, Fs, Rs, deletions, insertions, substitutions):
+        res = []
+        for f in Fs:
+            for r in Rs:
+                header = sequences[0]
+                f_name = f[2]
+                r_name = r[2]
+                f_ver = f[5]
+                r_ver = r[5]
+
+                start, f_match = TOOLS.match_fuzzily(
+                    f_ver, sequences[1], deletions, insertions, substitutions)
+                r_start, r_match = TOOLS.match_fuzzily(
+                    r_ver, sequences[2], deletions, insertions, substitutions)
+
+                try:
+                    end = len(sequences[1]) - 1 - r_start
+                except TypeError:
+                    end = None
+                    
+                if start is None or end is None:
+                    amplicon = ""
+                    amplicon_length = 0
+                else:
+                    amplicon = sequences[1][start:end]
+                    amplicon_length = len(amplicon)
+
+                PPC = TOOLS.calculate_PPC(F_primer=f_ver,
+                                            F_match=f_match,
+                                            R_primer=r_ver,
+                                            R_match=r_match)
+                res.append([f_name, f_ver, r_name, r_ver,
+                                    header, amplicon, amplicon_length, start, end, PPC])
+
+        df = pd.DataFrame(res, columns=self.COL_LIST)
+        return df

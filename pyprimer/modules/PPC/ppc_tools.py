@@ -11,7 +11,7 @@ class TOOLS:
                       sequence,
                       deletions=0,
                       insertions=0,
-                      substitutions=2) -> tuple(int, str):
+                      substitutions=2) -> tuple((int, str)):
         """Match strings fuzzily usign Levenshtein distance
 
         Arguments:
@@ -24,7 +24,7 @@ class TOOLS:
             substitutions {int} -- How many deletions can substitutions the patterns (default: {2})
 
         Returns:
-            tuple(int, str) -- Position and value of the closest matching pattern. 
+            tuple((int, str)) -- Position and value of the closest matching pattern. 
             (None, "") if the pattern was not found.
         """
         if pattern in sequence:
