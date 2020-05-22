@@ -56,15 +56,12 @@ class PPC(object):
         bench_df = pd.DataFrame(columns=self.COL_LIST)
         summary = pd.DataFrame(columns=self.SUMMARY_COL_LIST)
 
-        if self.memsave:
-            self._saver.initialize(bench_df)
+        filter_forward = self.primers["Type"] == "F"
+        filter_reverse = self.primers["Type"] == "R"
 
         with tqdm(unique_groups) as pbar:
             for group in pbar:
                 filter_group = self.primers["ID"] == group
-                filter_forward = self.primers["Type"] == "F"
-                filter_reverse = self.primers["Type"] == "R"
-
                 Fs = self.primers.loc[filter_group & filter_forward].values
                 Rs = self.primers.loc[filter_group & filter_reverse].values
 
@@ -74,40 +71,21 @@ class PPC(object):
                         lambda x: self.helper(x, Fs, Rs, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
-
-                v_stats = dict((key, []) for key in self.SUMMARY_COL_LIST)
-                for fversion in group_df["F Primer Version"].unique():
-                    for rversion in group_df["R Primer Version"].unique():
-                        filter_r_version = (group_df["R Primer Version"] == rversion)
-                        filter_f_version = (group_df["F Primer Version"] == fversion)
-                        filter_matching = filter_r_version & filter_f_version
-                        
-                        n_seqs = np.sum(filter_matching)
-                        seqs_matched = np.sum(filter_matching & (group_df["Amplicon Sense Length"] != 0))
-
-                        mean_ppc = group_df.loc[filter_matching, "PPC"].mean().round(5)
-                        
-                        v_stats["Primer Group"].append(group)
-                        v_stats["F Version"].append(fversion)
-                        v_stats["R Version"].append(rversion)
-                        v_stats["Mean PPC"].append(mean_ppc)
-                        v_stats["Sequences matched(%)"].append(
-                            (seqs_matched / n_seqs)*100)
+                v_stats = self._craft_summary(group_df, group)
+                
                 group_stats = pd.DataFrame(v_stats, columns=self.SUMMARY_COL_LIST)
                 summary = summary.append(group_stats)
 
                 if self.memsave:
                     self._saver.save_group(group_df, group)
-                else:
-                    bench_df = bench_df.append(group_df)
-
+        
         if self.memsave:
             print("Extended benchmark results were written to {}".format(
                 os.path.join(self._saver.tempdir, "PCRBenchmark.h5")))
         
         return summary
 
-    def helper(self, sequences, Fs, Rs, deletions, insertions, substitutions):
+    def helper(self, sequences, Fs, Rs, deletions, insertions, substitutions) -> pd.DataFrame:
         res = []
         for f in Fs:
             for r in Rs:
@@ -143,3 +121,26 @@ class PPC(object):
 
         df = pd.DataFrame(res, columns=self.COL_LIST)
         return df
+
+    def _craft_summary(self, group_df, group) -> dict:
+        v_stats = {key: [] for key in self.SUMMARY_COL_LIST}
+
+        for fversion in group_df["F Primer Version"].unique():
+            for rversion in group_df["R Primer Version"].unique():
+                filter_r_version = (group_df["R Primer Version"] == rversion)
+                filter_f_version = (group_df["F Primer Version"] == fversion)
+                filter_matching = filter_r_version & filter_f_version
+                
+                n_seqs = np.sum(filter_matching)
+                seqs_matched = np.sum(filter_matching & (group_df["Amplicon Sense Length"] != 0))
+
+                mean_ppc = group_df.loc[filter_matching, "PPC"].mean().round(5)
+                
+                v_stats["Primer Group"].append(group)
+                v_stats["F Version"].append(fversion)
+                v_stats["R Version"].append(rversion)
+                v_stats["Mean PPC"].append(mean_ppc)
+                v_stats["Sequences matched(%)"].append(
+                    (seqs_matched / n_seqs)*100)
+        
+        return v_stats

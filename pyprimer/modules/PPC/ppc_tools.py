@@ -65,14 +65,7 @@ class _MemSaver:
         self.tempdir = tempdir
         self.fname = fname
         self.col_list = col_list
-
-    def initialize(self, bench_df):
         os.makedirs(self.tempdir, exist_ok=True)
-        bench_df.to_hdf(path_or_buf=os.path.join(self.tempdir, self.fname),
-                        key="bench",
-                        mode="w",
-                        format="table",
-                        data_columns=True)
     
     def save_group(self, group_df, key):
         # extra weird fix for this problem:
