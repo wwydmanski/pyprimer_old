@@ -124,7 +124,17 @@ class PPC(object):
         df = pd.DataFrame(res, columns=self.COL_LIST)
         return df
 
-    def _craft_summary(self, group_df, group) -> dict:
+    def _craft_summary(self, group_df: pd.DataFrame, group: str) -> dict:
+        """Create summary of the analysis of a group of primers.
+
+        Args:
+            group_df (pd.DataFrame): Dataframe with detailed analysis
+            group (str): Name of the group of primers
+
+        Returns:
+            dict: Info about the group of primers specified 
+                  by SUMMARY_COL_LIST const.
+        """
         v_stats = {key: [] for key in self.SUMMARY_COL_LIST}
 
         for fversion in group_df["F Primer Version"].unique():
