@@ -58,17 +58,19 @@ class PPC(object):
 
         filter_forward = self.primers["Type"] == "F"
         filter_reverse = self.primers["Type"] == "R"
+        filter_probe = self.primers["Type"] == "R"
 
         with tqdm(unique_groups) as pbar:
             for group in pbar:
                 filter_group = self.primers["ID"] == group
                 Fs = self.primers.loc[filter_group & filter_forward].values
                 Rs = self.primers.loc[filter_group & filter_reverse].values
+                Ps = self.primers.loc[filter_group & filter_probe].values
 
                 dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
                 df_series = dsequences.map_partitions(
                     lambda df: df.apply(
-                        lambda x: self._calculate_stats(x, Fs, Rs, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
+                        lambda x: self._calculate_stats(x, Fs, Rs, Ps, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
 
                 group_df = pd.concat(df_series.tolist())
                 v_stats = self._craft_summary(group_df, group)
@@ -85,7 +87,21 @@ class PPC(object):
         
         return summary
 
-    def _calculate_stats(self, sequences, Fs, Rs, deletions, insertions, substitutions) -> pd.DataFrame:
+    def _calculate_stats(self, sequences, Fs, Rs, Ps, deletions, insertions, substitutions) -> pd.DataFrame:
+        """Calculate statistics for sequence set for every possible primer version combination
+
+        Args:
+            sequences (dask.Series): Sequences that we want to test the primers against
+            Fs (np.array): All forward primers from the group
+            Rs (np.array): All reverse primers from the group
+            Ps (np.array): All probes from the group
+            deletions (int): Number of deletions allowed by the fuzzy search
+            insertions (int): Number of insertions allowed by the fuzzy search
+            substitutions (int): Number of substitutions allowed by the fuzzy search
+
+        Returns:
+            pd.DataFrame: Info about the group of primers specified by COL_LIST const.
+        """
         res = []
         header = sequences[0]
         
