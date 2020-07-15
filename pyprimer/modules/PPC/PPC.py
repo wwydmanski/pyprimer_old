@@ -50,7 +50,17 @@ class PPC(object):
                         insertions=0,
                         substitutions=2,
                         nCores=2) -> pd.DataFrame:
+        """Analyse effectiveness of the PCR primers against sequences.
 
+        Args:
+            deletions (int, optional): Number of deletions allowed in the target sequence. Defaults to 0.
+            insertions (int, optional): Number of insertions allowed in the target sequence. Defaults to 0.
+            substitutions (int, optional): Number of substitutions allowed in the target sequence. Defaults to 2.
+            nCores (int, optional): Number of cores for concurrent processing. Defaults to 2.
+
+        Returns:
+            pd.DataFrame: Info about the group of primers with structure specified by SUMMARY_COL_LIST const.
+        """
         unique_groups = self.primers["ID"].unique()
 
         bench_df = pd.DataFrame(columns=self.COL_LIST)
@@ -100,7 +110,7 @@ class PPC(object):
             substitutions (int): Number of substitutions allowed by the fuzzy search
 
         Returns:
-            pd.DataFrame: Info about the group of primers specified by COL_LIST const.
+            pd.DataFrame: Info about the group of primers with structure specified by COL_LIST const.
         """
         res = []
         header = sequences[0]
