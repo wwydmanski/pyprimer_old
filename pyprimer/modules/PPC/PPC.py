@@ -16,16 +16,6 @@ import time
 import warnings
 from .ppc_tools import TOOLS, _MemSaver
 
-
-class PPCMetrics:
-    def __init__(self, positive_seqs: pd.DataFrame, negative_seqs: pd.DataFrame):
-        self.positive_seqs = positive_seqs
-        self.negative_seqs = negative_seqs
-
-    def get_metrics(self, primer):
-        pass
-
-
 class PPC(object):
     COL_LIST = ["F Primer Name",
                 "F Primer Version",
@@ -79,7 +69,6 @@ class PPC(object):
         filter_forward = self.primers["Type"] == "F"
         filter_reverse = self.primers["Type"] == "R"
         filter_probe = self.primers["Type"] == "R"
-        dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
 
         with tqdm(unique_groups) as pbar:
             for group in pbar:
@@ -87,15 +76,8 @@ class PPC(object):
                 Fs = self.primers.loc[filter_group & filter_forward].values
                 Rs = self.primers.loc[filter_group & filter_reverse].values
                 Ps = self.primers.loc[filter_group & filter_probe].values
-
-                df_series = dsequences.map_partitions(
-                    lambda df: df.apply(
-                        lambda x: self._calculate_stats(x, Fs, Rs, Ps, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
-
-                group_df = pd.concat(df_series.tolist())
-                v_stats = self._craft_summary(group_df, group)
-                
-                group_stats = pd.DataFrame(v_stats, columns=self.SUMMARY_COL_LIST)
+        
+                group_stats = self._calculate_group_summary(self.sequences, group, Fs, Rs, Ps, deletions, insertions, substitutions, nCores)
                 summary = summary.append(group_stats)
 
                 if self.memsave:
@@ -107,8 +89,17 @@ class PPC(object):
         
         return summary
 
-    def _calculate_group_summary(self, Fs, Rs, Ps):
-        pass
+    def _calculate_group_summary(self, sequences, group_name, Fs, Rs, Ps, deletions=0, insertions=0, substitutions=2, nCores=2):
+        dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
+        df_series = dsequences.map_partitions(
+            lambda df: df.apply(
+                lambda x: self._calculate_stats(x, Fs, Rs, Ps, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
+
+        group_df = pd.concat(df_series.tolist())
+        v_stats = self._craft_summary(group_df, group_name)
+        
+        group_stats = pd.DataFrame(v_stats, columns=self.SUMMARY_COL_LIST)
+        return group_stats
 
 
     def _calculate_stats(self, sequences, Fs, Rs, Ps, deletions, insertions, substitutions) -> pd.DataFrame:
