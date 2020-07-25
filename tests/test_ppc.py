@@ -1,9 +1,24 @@
 from pyprimer.modules import PPC
 from pyprimer.utils.sequence import PCRPrimer, Sequence, READ_MODES
+from pyprimer.modules.PPC.ppc_tools import TOOLS
 import pandas as pd
 import h5py
 
 data_dir = "/bi/aim/scratch/afrolova/COVID19/github/pyprimer/data"
+
+
+def test_fuzzy_match():
+    literal = TOOLS.match_fuzzily("TCGACATCACC", "TCGACATCACCA")
+    assert literal[0] == 0 and literal[1] == "TCGACATCACC"
+    
+    gappy = TOOLS.match_fuzzily("TGGACATCACC", "TCGACATCACCA")
+    assert gappy[0] == 0 and gappy[1] == "TCGACATCACC"
+
+    wrong = TOOLS.match_fuzzily("ACCGTAT", "TCGACATCACCA")
+    assert wrong[0] is None and wrong[1] == ''
+
+    edgy = TOOLS.match_fuzzily("TCGAGACC", "ACTTGACATCGACATCACCA")
+    assert edgy[0] == 8 and edgy[1] == "TCGACATC"
 
 
 def test_PPC_calculation():
@@ -34,3 +49,7 @@ def test_PPC_temp_memory():
         goal_df = pd.read_hdf("tests/goal_tmp/PCRBenchmark.h5", key=key)
         tested_df = pd.read_hdf("tests/test_tmp/PCRBenchmark.h5", key=key)
     assert tested_df.equals(goal_df)
+
+
+if __name__=="__main__":
+    test_fuzzy_match()
