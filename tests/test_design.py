@@ -26,8 +26,8 @@ def test_design_points(read_squences):
     P2 = "CTAGCCATGCCCTTAGT"
 
     dps = test_pcr.get_primer_metrics([F, F2], [R, R2], [P, P2], nCores=2)
-    dps_0 = 0.941*100 + 99.397 - 13.747     # PPC + accuracy - gc penalty
-    dps_1 = -3.783
+    dps_0 = 0.941*100 + 99.397 - 8.262    # PPC + accuracy - gc penalty
+    dps_1 = -1.239
 
-    assert np.isclose(dps[1], dps_1), str(dps[1])
     assert np.isclose(dps[0], dps_0), str(dps[0])
+    assert np.isclose(dps[1], dps_1), str(dps[1])

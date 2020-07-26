@@ -126,18 +126,36 @@ class PPC(object):
             R = np.array(R)
         if P is not None and type(P)==list:
             P = np.array(P) 
+
+        if type(F)==np.ndarray and F.ndim==2:
+            F_new = []
+            for i in F:
+                F_new.append("".join(i))
+            F = np.asarray(F_new)
+        if type(R)==np.ndarray and R.ndim==2:
+            R_new = []
+            for i in R:
+                R_new.append("".join(i))
+            R = np.asarray(R_new)
         
-        stats = self._calculate_group_summary(self.sequences, "DP", F, R, P, deletions=0, insertions=0, substitutions=2, nCores=2, permute=False)
-        mean_ppc = (stats["Mean PPC"].values*100).round(3)
-        matched = stats["Sequences matched(%)"].values.round(3)
+        stats = self._calculate_group_summary(self.sequences, "DP", F, R, P, deletions=0, insertions=0, substitutions=2, nCores=nCores, permute=False)
 
         gc = []
-        for f, r, p in zip(F, R, P):
+        mean_ppc = []
+        matched = []
+        for f, r in zip(F, R):
+            filt = (stats["F Version"]==f) & (stats["R Version"]==r)
             gc.append(
-                (Essentials.GCcontent(f) + Essentials.GCcontent(r) + Essentials.GCcontent(p) - GC_GOAL*3)**2 
+                (Essentials.GCcontent(f) + Essentials.GCcontent(r) - GC_GOAL*2)**2 
                 / NORM_FACTOR
                 )
+            mean_ppc.append((stats[filt]["Mean PPC"].values*100)[0])
+            matched.append(stats[filt]["Sequences matched(%)"].values[0])
+
         gc = np.asarray(gc).round(3)
+        mean_ppc = np.asarray(mean_ppc).round(3)
+        matched = np.asarray(matched).round(3)
+
         return mean_ppc + matched - gc
 
     def _calculate_group_summary(self, sequences, group_name,         
