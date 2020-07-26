@@ -16,6 +16,8 @@ import time
 import warnings
 from pyprimer.modules.PPC.ppc_tools import TOOLS, _MemSaver
 
+from pyprimer.utils.sequence import Essentials
+
 class PPC(object):
     COL_LIST = ["F Primer Name",
                 "F Primer Version",
@@ -108,6 +110,9 @@ class PPC(object):
             substitutions (int): Number of substitutions allowed by the fuzzy search. Defaults to 2.
             nCores (int, optional): Number of cores for concurrent processing. Defaults to 2.
         """
+        GC_GOAL = 60
+        NORM_FACTOR = GC_GOAL**2/50
+
         if type(F)==str:
             F = np.array([F])
         if type(R)==str:
@@ -122,19 +127,30 @@ class PPC(object):
         if P is not None and type(P)==list:
             P = np.array(P) 
         
-        stats = self._calculate_group_summary(self.sequences, "DP", F, R, P, deletions=0, insertions=0, substitutions=2, nCores=2)
-        return stats["Mean PPC"].values, stats["Sequences matched(%)"].values
+        stats = self._calculate_group_summary(self.sequences, "DP", F, R, P, deletions=0, insertions=0, substitutions=2, nCores=2, permute=False)
+        mean_ppc = (stats["Mean PPC"].values*100).round(3)
+        matched = stats["Sequences matched(%)"].values.round(3)
+
+        gc = []
+        for f, r, p in zip(F, R, P):
+            gc.append(
+                (Essentials.GCcontent(f) + Essentials.GCcontent(r) + Essentials.GCcontent(p) - GC_GOAL*3)**2 
+                / NORM_FACTOR
+                )
+        gc = np.asarray(gc).round(3)
+        return mean_ppc + matched - gc
 
     def _calculate_group_summary(self, sequences, group_name,         
         f_versions, r_versions, p_versions,
         f_names=None, r_names=None, p_names=None, 
-        deletions=0, insertions=0, substitutions=2, nCores=2):
+        deletions=0, insertions=0, substitutions=2, nCores=2,
+        permute = True):
         
         def __calculate(x):
             return self._calculate_stats(x, 
                 f_versions, r_versions, p_versions, 
                 f_names, r_names, p_names,
-                deletions, insertions, substitutions)
+                deletions, insertions, substitutions, permute)
 
         if f_names is None:
             f_names = np.array([""]*len(f_versions))
@@ -153,14 +169,13 @@ class PPC(object):
             self._saver.save_group(group_df, group_name)
 
         v_stats = self._craft_summary(group_df, group_name)
-        
         group_stats = pd.DataFrame(v_stats, columns=self.SUMMARY_COL_LIST)
         return group_stats
 
     def _calculate_stats(self, sequences,
         f_vers, r_vers, p_vers,
         f_names, r_names, p_names,
-        deletions, insertions, substitutions) -> pd.DataFrame:
+        deletions, insertions, substitutions, permute) -> pd.DataFrame:
         """Calculate statistics for sequence set for every possible primer version combination
 
         Args:
@@ -177,33 +192,73 @@ class PPC(object):
         """
         res = []
         header = sequences[0]
-        
-        for f_ver, f_name in zip(f_vers, f_names):
-            start, f_match = TOOLS.match_fuzzily(
-                f_ver, sequences[1], deletions, insertions, substitutions)
+        if permute:
+            for f_ver, f_name in zip(f_vers, f_names):
+                start, f_match = TOOLS.match_fuzzily(
+                    f_ver, sequences[1], deletions, insertions, substitutions)
 
-            for r_ver, r_name in zip(r_vers, r_names):
-                r_start, r_match = TOOLS.match_fuzzily(
-                    r_ver, sequences[2], deletions, insertions, substitutions)
-                try:
-                    end = len(sequences[1]) - 1 - r_start
-                except TypeError:
-                    end = None
+                for r_ver, r_name in zip(r_vers, r_names):
+                    if start is not None:
+                        r_start, r_match = TOOLS.match_fuzzily(
+                            r_ver, sequences[2], deletions, insertions, substitutions)
+                        try:
+                            end = len(sequences[1]) - 1 - r_start
+                        except TypeError:
+                            end = None
                     
+                    if start is None or end is None or end<0:
+                        amplicon = ""
+                        amplicon_length = 0
+                        start = None
+                        end = None
+                        PPC = 0
+                    else:
+                        amplicon = sequences[1][start:end]
+                        amplicon_length = len(amplicon)
+
+                        PPC = TOOLS.calculate_PPC(F_primer=f_ver,
+                                                    F_match=f_match,
+                                                    R_primer=r_ver,
+                                                    R_match=r_match)
+
+                    res.append([f_name, f_ver, r_name, r_ver,
+                                        header, amplicon, amplicon_length, start, end, PPC])
+
+        else:
+            for primer_set in range(len(f_vers)):
+                f_ver = f_vers[primer_set]
+                f_name = f_names[primer_set]
+                r_ver = r_vers[primer_set]
+                r_name = r_names[primer_set]
+
+                start, f_match = TOOLS.match_fuzzily(
+                    f_ver, sequences[1], deletions, insertions, substitutions)
+
+                if start is not None:
+                    r_start, r_match = TOOLS.match_fuzzily(
+                            r_ver, sequences[2], deletions, insertions, substitutions)
+                    try:
+                        end = len(sequences[1]) - 1 - r_start
+                    except TypeError:
+                        end = None
+
                 if start is None or end is None or end<0:
                     amplicon = ""
                     amplicon_length = 0
+                    start = None
+                    end = None
+                    PPC = 0
                 else:
                     amplicon = sequences[1][start:end]
                     amplicon_length = len(amplicon)
 
-                PPC = TOOLS.calculate_PPC(F_primer=f_ver,
-                                            F_match=f_match,
-                                            R_primer=r_ver,
-                                            R_match=r_match)
+                    PPC = TOOLS.calculate_PPC(F_primer=f_ver,
+                                                F_match=f_match,
+                                                R_primer=r_ver,
+                                                R_match=r_match)
+
                 res.append([f_name, f_ver, r_name, r_ver,
                                     header, amplicon, amplicon_length, start, end, PPC])
-
         df = pd.DataFrame(res, columns=self.COL_LIST)
         return df
 
@@ -219,23 +274,23 @@ class PPC(object):
                   by SUMMARY_COL_LIST const.
         """
         v_stats = {key: [] for key in self.SUMMARY_COL_LIST}
-
         for fversion in group_df["F Primer Version"].unique():
             for rversion in group_df["R Primer Version"].unique():
                 filter_r_version = (group_df["R Primer Version"] == rversion)
                 filter_f_version = (group_df["F Primer Version"] == fversion)
                 filter_matching = filter_r_version & filter_f_version
-                
-                n_seqs = np.sum(filter_matching)
-                seqs_matched = np.sum(filter_matching & (group_df["Amplicon Sense Length"] != 0))
 
-                mean_ppc = group_df.loc[filter_matching, "PPC"].mean().round(5)
-                
-                v_stats["Primer Group"].append(group)
-                v_stats["F Version"].append(fversion)
-                v_stats["R Version"].append(rversion)
-                v_stats["Mean PPC"].append(mean_ppc)
-                v_stats["Sequences matched(%)"].append(
-                    (seqs_matched / n_seqs)*100)
+                if np.sum(filter_matching)>0:
+                    n_seqs = np.sum(filter_matching)
+                    seqs_matched = np.sum(filter_matching & (group_df["Amplicon Sense Length"] != 0))
+
+                    mean_ppc = group_df.loc[filter_matching, "PPC"].mean().round(5)
+                    
+                    v_stats["Primer Group"].append(group)
+                    v_stats["F Version"].append(fversion)
+                    v_stats["R Version"].append(rversion)
+                    v_stats["Mean PPC"].append(mean_ppc)
+                    v_stats["Sequences matched(%)"].append(
+                        (seqs_matched / n_seqs)*100)
         
         return v_stats

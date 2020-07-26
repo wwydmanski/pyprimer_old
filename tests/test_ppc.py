@@ -36,9 +36,9 @@ def test_PPC_calculation(read_squences):
     
     test_pcr = PPC(primer_df, sequences_df.sample(100, random_state=42))
     summary = test_pcr.analyse_primers(nCores=8, deletions=1, insertions=0, substitutions=2)
-    summary.to_csv("tests/test_summary_df.csv", index = False)
+    summary.to_csv("tests/test_tmp/summary_df.csv", index = False)
 
-    assert pd.read_csv("tests/test_summary_df.csv").equals(pd.read_csv("tests/goal_summary_df.csv"))
+    assert pd.read_csv("tests/test_tmp/summary_df.csv").equals(pd.read_csv("tests/goal_tmp/summary_df.csv"))
 
 
 def test_PPC_temp_memory(read_squences):
