@@ -14,7 +14,7 @@ import dask.threaded
 import sys
 import time
 import warnings
-from .ppc_tools import TOOLS, _MemSaver
+from pyprimer.modules.PPC.ppc_tools import TOOLS, _MemSaver
 
 class PPC(object):
     COL_LIST = ["F Primer Name",
@@ -76,12 +76,19 @@ class PPC(object):
                 Fs = self.primers.loc[filter_group & filter_forward].values
                 Rs = self.primers.loc[filter_group & filter_reverse].values
                 Ps = self.primers.loc[filter_group & filter_probe].values
-        
-                group_stats = self._calculate_group_summary(self.sequences, group, Fs, Rs, Ps, deletions, insertions, substitutions, nCores)
-                summary = summary.append(group_stats)
 
-                if self.memsave:
-                    self._saver.save_group(group_df, group)
+                f_versions = Fs[:, 5]
+                f_names = Fs[:, 2]
+                r_versions = Rs[:, 5]
+                r_names = Rs[:, 2]
+                p_versions = Ps[:, 5]
+                p_names = Ps[:, 2]
+
+                group_stats = self._calculate_group_summary(self.sequences, group, 
+                                    f_versions, r_versions, p_versions,
+                                    f_names, r_names, p_names,
+                                    deletions, insertions, substitutions, nCores)
+                summary = summary.append(group_stats)
         
         if self.memsave:
             print("Extended benchmark results were written to {}".format(
@@ -89,20 +96,56 @@ class PPC(object):
         
         return summary
 
-    def _calculate_group_summary(self, sequences, group_name, Fs, Rs, Ps, deletions=0, insertions=0, substitutions=2, nCores=2):
+    def get_primer_metrics(self, F, R, P=None, deletions=0, insertions=0, substitutions=2, nCores=2):
+        """Calculate Design Points for a primer or group of primers
+
+        Args:
+            F (str or np.array): Forward primer(s)
+            R (str or np.array): Reverse primer(s)
+            P (str or np.array, optional): Probe(s)
+            deletions (int): Number of deletions allowed by the fuzzy search. Defaults to 0.
+            insertions (int): Number of insertions allowed by the fuzzy search. Defaults to 0.
+            substitutions (int): Number of substitutions allowed by the fuzzy search. Defaults to 2.
+            nCores (int, optional): Number of cores for concurrent processing. Defaults to 2.
+        """
+        if type(F)==str:
+            F = np.array([F])
+        if type(R)==str:
+            R = np.array([R])
+        if P is not None and type(P)==str:
+            P = np.array([P])
+
+        stats = self._calculate_group_summary(self.sequences, "DP", F, R, P, deletions=0, insertions=0, substitutions=2, nCores=2)
+        return stats["Mean PPC"].values, stats["Sequences matched(%)"].values
+
+    def _calculate_group_summary(self, sequences, group_name,         
+        f_versions, r_versions, p_versions,
+        f_names=np.array([[""]]), r_names=np.array([[""]]), p_names=np.array([[""]]), 
+        deletions=0, insertions=0, substitutions=2, nCores=2):
+        def __calculate(x):
+            return self._calculate_stats(x, 
+                f_versions, r_versions, p_versions, 
+                f_names, r_names, p_names,
+                deletions, insertions, substitutions)
+            
         dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
         df_series = dsequences.map_partitions(
-            lambda df: df.apply(
-                lambda x: self._calculate_stats(x, Fs, Rs, Ps, deletions, insertions, substitutions), axis=1), meta=('df', None)).compute(scheduler='processes')
+            lambda df: df.apply(__calculate, axis=1), meta=('df', None)
+            ).compute(scheduler='processes')
 
         group_df = pd.concat(df_series.tolist())
+        if self.memsave:
+            self._saver.save_group(group_df, group_name)
+
         v_stats = self._craft_summary(group_df, group_name)
         
         group_stats = pd.DataFrame(v_stats, columns=self.SUMMARY_COL_LIST)
         return group_stats
 
-
-    def _calculate_stats(self, sequences, Fs, Rs, Ps, deletions, insertions, substitutions) -> pd.DataFrame:
+    def _calculate_stats(self, sequences,
+        f_vers, r_vers, p_vers,
+        f_names, r_names, p_names,
+        deletions, insertions, substitutions) -> pd.DataFrame:
         """Calculate statistics for sequence set for every possible primer version combination
 
         Args:
@@ -120,25 +163,19 @@ class PPC(object):
         res = []
         header = sequences[0]
         
-        for f in Fs:
-            f_ver = f[5]
-            f_name = f[2]
+        for f_ver, f_name in zip(f_vers, f_names):
             start, f_match = TOOLS.match_fuzzily(
                 f_ver, sequences[1], deletions, insertions, substitutions)
 
-            for r in Rs:
-                r_name = r[2]
-                r_ver = r[5]
-
+            for r_ver, r_name in zip(r_vers, r_names):
                 r_start, r_match = TOOLS.match_fuzzily(
                     r_ver, sequences[2], deletions, insertions, substitutions)
-
                 try:
                     end = len(sequences[1]) - 1 - r_start
                 except TypeError:
                     end = None
                     
-                if start is None or end is None:
+                if start is None or end is None or end<0:
                     amplicon = ""
                     amplicon_length = 0
                 else:

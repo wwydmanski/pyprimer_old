@@ -52,4 +52,4 @@ def test_PPC_temp_memory():
 
 
 if __name__=="__main__":
-    test_fuzzy_match()
+    test_PPC_temp_memory()
