@@ -115,19 +115,34 @@ class PPC(object):
         if P is not None and type(P)==str:
             P = np.array([P])
 
+        if type(F)==list:
+            F = np.array(F)
+        if type(R)==list:
+            R = np.array(R)
+        if P is not None and type(P)==list:
+            P = np.array(P) 
+        
         stats = self._calculate_group_summary(self.sequences, "DP", F, R, P, deletions=0, insertions=0, substitutions=2, nCores=2)
         return stats["Mean PPC"].values, stats["Sequences matched(%)"].values
 
     def _calculate_group_summary(self, sequences, group_name,         
         f_versions, r_versions, p_versions,
-        f_names=np.array([[""]]), r_names=np.array([[""]]), p_names=np.array([[""]]), 
+        f_names=None, r_names=None, p_names=None, 
         deletions=0, insertions=0, substitutions=2, nCores=2):
+        
         def __calculate(x):
             return self._calculate_stats(x, 
                 f_versions, r_versions, p_versions, 
                 f_names, r_names, p_names,
                 deletions, insertions, substitutions)
-            
+
+        if f_names is None:
+            f_names = np.array([""]*len(f_versions))
+        if r_names is None:
+            r_names = np.array([""]*len(r_versions))
+        if p_names is None:
+            p_names = np.array([""]*len(p_versions))
+
         dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
         df_series = dsequences.map_partitions(
             lambda df: df.apply(__calculate, axis=1), meta=('df', None)
