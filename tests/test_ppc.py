@@ -3,9 +3,19 @@ from pyprimer.utils.sequence import PCRPrimer, Sequence, READ_MODES
 from pyprimer.modules.PPC.ppc_tools import TOOLS
 import pandas as pd
 import h5py
+import pytest
 
 data_dir = "/bi/aim/scratch/afrolova/COVID19/github/pyprimer/data"
 
+@pytest.fixture()
+def read_squences():
+    test_primer = PCRPrimer(READ_MODES.DIRECTORY)
+    primer_df = test_primer.describe_primers(f"{data_dir}/primers")
+
+    test_sequence = Sequence(READ_MODES.FASTA)
+    sequences_df = test_sequence.describe_sequences(f"{data_dir}/merged.fasta")
+
+    return primer_df, sequences_df
 
 def test_fuzzy_match():
     literal = TOOLS.match_fuzzily("TCGACATCACC", "TCGACATCACCA")
@@ -21,12 +31,8 @@ def test_fuzzy_match():
     assert edgy[0] == 8 and edgy[1] == "TCGACATC"
 
 
-def test_PPC_calculation():
-    test_primer = PCRPrimer(READ_MODES.DIRECTORY)
-    primer_df = test_primer.describe_primers(f"{data_dir}/primers")
-
-    test_sequence = Sequence(READ_MODES.FASTA)
-    sequences_df = test_sequence.describe_sequences(f"{data_dir}/merged.fasta")
+def test_PPC_calculation(read_squences):
+    primer_df, sequences_df = read_squences
     
     test_pcr = PPC(primer_df, sequences_df.sample(100, random_state=42))
     summary = test_pcr.analyse_primers(nCores=8, deletions=1, insertions=0, substitutions=2)
@@ -35,12 +41,8 @@ def test_PPC_calculation():
     assert pd.read_csv("tests/test_summary_df.csv").equals(pd.read_csv("tests/goal_summary_df.csv"))
 
 
-def test_PPC_temp_memory():
-    test_primer = PCRPrimer(READ_MODES.DIRECTORY)
-    primer_df = test_primer.describe_primers(f"{data_dir}/primers")
-
-    test_sequence = Sequence(READ_MODES.FASTA)
-    sequences_df = test_sequence.describe_sequences(f"{data_dir}/merged.fasta")
+def test_PPC_temp_memory(read_squences):
+    primer_df, sequences_df = read_squences
     
     test_pcr = PPC(primer_df, sequences_df.sample(100, random_state=42), memsave=True, tempdir="tests/test_tmp")
     _ = test_pcr.analyse_primers(nCores=8, deletions=1, insertions=0, substitutions=2)
