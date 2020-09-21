@@ -7,7 +7,7 @@ import numpy as np
 from numba import jit
 from enum import Enum
 from .essentials import Essentials
-
+import tqdm
 
 class READ_MODES(Enum):
     CSV = 1
@@ -135,7 +135,17 @@ class Sequence(object):
     def __init__(self, mode):
         self.mode = mode
 
-    def describe_sequences(self, seqs_path):
+    def describe_sequences(self, seqs_path, seqs_no=None, verbose=False):
+        """Calculate description of the input sequences
+
+        Args:
+            seqs_path (str): Path to the seqences
+            seqs_no (int, optional): Take only the first `seqs_no` number of sequences. Defaults to None.
+            verbose (bool): Flag that enables the progressbar
+
+        Returns:
+            pd.DataFrame: Summary of the sequences
+        """
         if self.mode == READ_MODES.CSV:
             # TODO for DataFrame with columns "Header" "Sequence"
             # seqs_df = pd.read_csv(self.seqs_path)
@@ -151,6 +161,12 @@ class Sequence(object):
             fastalist = fasta.split("\n>")
             seriesdict = {"Header": [], "Sense Sequence": [],
                           "Antisense Sequence": [], "Length": [], "N(%)": []}
+            
+            if seqs_no is not None:
+                fastalist = fastalist[:seqs_no]
+            if verbose:
+                fastalist = tqdm.tqdm(fastalist)
+                
             idx = 0
             for element in fastalist:
                 element_list = element.split("\n")
