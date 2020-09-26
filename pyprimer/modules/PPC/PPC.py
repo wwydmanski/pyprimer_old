@@ -178,15 +178,22 @@ class PPC(object):
             p_names = np.array([""]*len(p_versions))
 
         dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
+        self.bar = tqdm(total=len(self.sequences))
         df_series = dsequences.map_partitions(
             lambda df: df.apply(__calculate, axis=1), meta=('df', None)
             ).compute(scheduler='processes')
-
+        
+        print("Concatenating")
         group_df = pd.concat(df_series.tolist())
+        print("Concatenated")
         if self.memsave:
             self._saver.save_group(group_df, group_name)
 
+        print("Saved (or not)")
+
         v_stats = self._craft_summary(group_df, group_name)
+        print("Crafted summary")
+
         group_stats = pd.DataFrame(v_stats, columns=self.SUMMARY_COL_LIST)
         return group_stats
 
@@ -210,6 +217,7 @@ class PPC(object):
         """
         res = []
         header = sequences[0]
+        self.bar.update()
         if permute:
             for f_ver, f_name in zip(f_vers, f_names):
                 start, f_match = TOOLS.match_fuzzily(

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 def entropy_calculation(sequences, window_size=3, start=0, end=None, verbose=False, draw=False):
     if end is None:
-        end = len(len(sequences['Sense Sequence'].values[0]))
+        end = len(sequences['Sense Sequence'].values[0])
     
     length = end-start
     
@@ -27,7 +27,7 @@ def entropy_calculation(sequences, window_size=3, start=0, end=None, verbose=Fal
             res[i] = len(set(vals))
         
         ent = 0
-        for val in vals:
+        for val in list(set(vals)):
             p = vals.count(val)/len(vals)
             ent -= p*np.log(p)
         entropy[i] = ent

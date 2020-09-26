@@ -13,12 +13,12 @@ class PrimerDesigner:
         self.toolbox = base.Toolbox()
 
         self.toolbox.register("nuclei", np.random.choice, list("ATGC"))
-        self.toolbox.register("individual", tools.initRepeat, creator.Individual, self.toolbox.nuclei, n=20)
+        self.toolbox.register("individual", tools.initRepeat, creator.Individual, self.toolbox.nuclei, n=40)
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
 
         def eval_population(population):
             pop = np.asarray(population)
-            dps = test_pcr.get_primer_metrics(pop[:, :10], pop[:, 10:], ["", ""], nCores=4)
+            dps = test_pcr.get_primer_metrics(pop[:, :20], pop[:, 20:], ["", ""], nCores=8)
             return dps,
 
         self.toolbox.register("evaluate", eval_population)
@@ -26,8 +26,8 @@ class PrimerDesigner:
         self.toolbox.register("mutate", tools.mutShuffleIndexes, indpb=0.05)
         self.toolbox.register("select", tools.selTournament, tournsize=3)
 
-        self.population = self.toolbox.population(n=20)
-        self.NGEN=40
+        self.population = self.toolbox.population(n=200)
+        self.NGEN=100
 
     def design(self):
         with trange(self.NGEN) as t:
@@ -49,7 +49,7 @@ if __name__=="__main__":
     test_sequence = Sequence(READ_MODES.FASTA)
     sequences_df = test_sequence.describe_sequences(f"{data_dir}/merged.fasta")
 
-    test_pcr = PPC(None, sequences_df)
+    test_pcr = PPC(None, sequences_df.sample(100))
     designer = PrimerDesigner(test_pcr)
 
     try:
