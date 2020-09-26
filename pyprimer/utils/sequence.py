@@ -135,7 +135,7 @@ class Sequence(object):
     def __init__(self, mode):
         self.mode = mode
 
-    def describe_sequences(self, seqs_path, seqs_no=None, verbose=False):
+    def describe_sequences(self, seqs_path, seqs_no=None, verbose=False, full=True):
         """Calculate description of the input sequences
 
         Args:
@@ -175,15 +175,18 @@ class Sequence(object):
                     element_list[1:]).replace("-", "N").upper()
                 del element_list
                 try:
-                    antisense_sequence = Essentials.Antisense(sequence[::-1])
                     length_sequence = len(sequence)
-                    n_percent = np.multiply(
-                        np.divide(Counter(sequence).pop("N", 0), length_sequence), 100)
+
+                    if full:
+                        antisense_sequence = Essentials.Antisense(sequence[::-1])
+                        n_percent = np.multiply(
+                            np.divide(Counter(sequence).pop("N", 0), length_sequence), 100)
+                        seriesdict["Antisense Sequence"].append(antisense_sequence)
+                        seriesdict["N(%)"].append(n_percent)
+
+                    seriesdict["Length"].append(length_sequence)
                     seriesdict["Header"].append(header)
                     seriesdict["Sense Sequence"].append(sequence)
-                    seriesdict["Antisense Sequence"].append(antisense_sequence)
-                    seriesdict["Length"].append(length_sequence)
-                    seriesdict["N(%)"].append(n_percent)
                 except:
                     os.makedirs("./logs/",  mode=755, exist_ok=True)
                     with open("./Problematic_{}_{}.txt".format(header[-14:], idx), "w") as f:
