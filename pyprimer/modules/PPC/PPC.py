@@ -165,6 +165,10 @@ class PPC(object):
         permute = True):
         
         def __calculate(x):
+            # print(x, 
+            #     f_versions, r_versions, p_versions, 
+            #     f_names, r_names, p_names,
+            #     deletions, insertions, substitutions, permute)
             return self._calculate_stats(x, 
                 f_versions, r_versions, p_versions, 
                 f_names, r_names, p_names,
@@ -178,7 +182,7 @@ class PPC(object):
             p_names = np.array([""]*len(p_versions))
 
         dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
-        self.bar = tqdm(total=len(self.sequences))
+        # self.bar = tqdm(total=len(self.sequences))
         df_series = dsequences.map_partitions(
             lambda df: df.apply(__calculate, axis=1), meta=('df', None)
             ).compute(scheduler='processes')
@@ -217,7 +221,7 @@ class PPC(object):
         """
         res = []
         header = sequences[0]
-        self.bar.update()
+        # self.bar.update()
         if permute:
             for f_ver, f_name in zip(f_vers, f_names):
                 start, f_match = TOOLS.match_fuzzily(

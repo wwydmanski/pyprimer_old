@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="pyprimer", # Replace with your own username
-    version="0.0.1a0",
+    version="0.0.2a0",
     author="Alina Frolova, Michał Kowalski, Witold Wydmański, Paweł Łabaj",
     author_email="fshodan@gmail.com, michal.bozydar.kowalski@gmail.com, wwydmanski@gmail.com, pawel.labaj@gmail.com",
     description="Python library for primer bechnmark and primer design for PCR and LAMP assays",
