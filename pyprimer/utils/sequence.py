@@ -189,7 +189,7 @@ class Sequence(object):
                     seriesdict["Sense Sequence"].append(sequence)
                 except:
                     os.makedirs("./logs/",  mode=755, exist_ok=True)
-                    with open("./Problematic_{}_{}.txt".format(header[-14:], idx), "w") as f:
+                    with open("./logs/Problematic_{}_{}.txt".format(header[-14:], idx), "w") as f:
                         f.write(sequence)
                     raise KeyError(
                         'Unexpected character in {} [index {}]'.format(header, idx))

@@ -28,6 +28,7 @@ class TOOLS:
             tuple((int, str)) -- Position and value of the closest matching pattern. 
             (None, "") if the pattern was not found.
         """
+        # todo: split the sequences into sections basing on previous matches statistics?
         if pattern in sequence:
             start = sequence.index(pattern)
             return start, pattern

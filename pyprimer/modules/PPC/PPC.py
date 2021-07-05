@@ -15,7 +15,7 @@ import sys
 import time
 import warnings
 from pyprimer.modules.PPC.ppc_tools import TOOLS, _MemSaver
-
+from pandarallel import pandarallel
 from pyprimer.utils.sequence import Essentials
 
 class PPC(object):
@@ -181,12 +181,20 @@ class PPC(object):
         if p_names is None:
             p_names = np.array([""]*len(p_versions))
 
-        dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
         # self.bar = tqdm(total=len(self.sequences))
-        df_series = dsequences.map_partitions(
-            lambda df: df.apply(__calculate, axis=1), meta=('df', None)
-            ).compute(scheduler='processes')
-        
+
+        if nCores==1:
+            df_series = self.sequences.progress_apply(__calculate, axis=1)
+        else:
+            # dsequences = dd.from_pandas(self.sequences, npartitions=nCores)
+            # df_series = dsequences.map_partitions(
+            #     lambda df: df.apply(__calculate, axis=1), meta=('df', None)
+            #     )
+            # # df_series = df_series.compute(scheduler='processes')
+            # df_series = df_series.compute()
+            pandarallel.initialize(nb_workers=nCores, progress_bar=True)
+            df_series = self.sequences.parallel_apply(__calculate, axis=1)
+
         print("Concatenating")
         group_df = pd.concat(df_series.tolist())
         print("Concatenated")
@@ -221,9 +229,10 @@ class PPC(object):
         """
         res = []
         header = sequences[0]
-        # self.bar.update()
         if permute:
             for f_ver, f_name in zip(f_vers, f_names):
+                # self.bar.update()
+
                 start, f_match = TOOLS.match_fuzzily(
                     f_ver, sequences[1], deletions, insertions, substitutions)
 
@@ -256,6 +265,8 @@ class PPC(object):
 
         else:
             for primer_set in range(len(f_vers)):
+                self.bar.update()
+
                 f_ver = f_vers[primer_set]
                 f_name = f_names[primer_set]
                 r_ver = r_vers[primer_set]
